@@ -5,8 +5,8 @@ const TW = 40, TH = 20, WH = 14, TOP = WH + 12, OX = B.H * TW / 2;
 // Room scenes (isometric cutaway pictures), by room name without spaces/punctuation, lowercase.
 // Drawn on the board in place of the plain room. ratio = picture height / width.
 export const ROOM_ART = {
-  library: { src: 'img/rooms/library-board.webp', ratio: 463 / 720, w: 176 },
-  study: { src: 'img/rooms/study-room.webp', ratio: 852 / 900, w: 176 },
+  library: { src: 'img/rooms/library-room.webp', ratio: 852 / 900, w: 176 },
+  study: { src: 'img/rooms/study-desk.webp', ratio: 892 / 900, w: 176 },
   ballroom: { src: 'img/rooms/ballroom-room.webp', ratio: 972 / 900, w: 176 },
 };
 export const SEAT_COLORS = ['#c62828', '#e1ad01', '#f2efe8', '#2e7d32', '#1565c0', '#8e24aa'];
