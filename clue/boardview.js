@@ -2,6 +2,8 @@
 import * as B from './board.js';
 
 const TW = 40, TH = 20, WH = 14, TOP = WH + 12, OX = B.H * TW / 2;
+// Room scenes (isometric cutaway pictures), by room name without spaces/punctuation, lowercase.
+export const ROOM_ART = { library: 'img/rooms/library.webp' };
 export const SEAT_COLORS = ['#c62828', '#e1ad01', '#f2efe8', '#2e7d32', '#1565c0', '#8e24aa'];
 const FLOORS = ['#8b8f78', '#7d6c93', '#5c8a6a', '#94705c', '#4c7b72', '#7d5d49', '#8e5c6b', '#8d8062', '#5c6d8f'];
 const P = (x, y, z) => [(x - y) * TW / 2 + OX, (x + y) * TH / 2 + TOP - (z || 0)];
