@@ -352,6 +352,13 @@ export function startApp({ net, doc, win, delays }) {
     return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.</b><br>' + esc(cards) + '</div>';
   }
 
+  // The words on a card's label plate in the finale: "Mr. PLUM", "HALL", "REVOLVER".
+  const TITLES = { scarlett: 'Miss', mustard: 'Col.', white: 'Mrs.', green: 'Mr.', peacock: 'Mrs.', plum: 'Mr.' };
+  function plateText(D, c) {
+    const key = susKey(D, c);
+    if (key) return (TITLES[key] ? TITLES[key] + ' ' : '') + key.toUpperCase();
+    return D.CARDS[c].toUpperCase();
+  }
   // The case-closed finale: an open case file, three folded cards turned one at a time
   // (room, weapon, suspect), then WINNER is stamped on. Timing comes from --t (seconds since it
   // started), so a re-render in the middle of it carries on instead of starting over.
@@ -368,14 +375,15 @@ export function startApp({ net, doc, win, delays }) {
     h += '<div class="fin-top"><div class="muted">' + (g.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div>' +
       '<div class="fin-name"' + st(5.1) + '>' + esc(nmFull(w)) + '</div>' +
       '<div class="fin-stars" role="img" aria-label="Three stars"' + st(5.35) + '></div></div>';
-    h += '<div class="folder"><div class="fshake"' + st(5) + '><div class="ftab">Case file</div><div class="fbody"><div class="fcards">';
+    h += '<div class="folder"><div class="fshake"' + st(5) + '><div class="fbox">';
     cards.forEach((c, k) => {
       const src = portrait(D, c);
       h += '<div class="epos p' + k + '"><div class="ec"' + st(0.3 + 0.15 * k) + '><div class="ecin"' + st(at[k]) + '>' +
-        '<div class="eb"></div><div class="fc live ef' + (src ? ' art' : '') + '"><div class="in">' + (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
-        '<small>' + S.CAT_NAMES[k] + '</small><b' + (D.CARDS[c].length > 10 ? ' class="long"' : '') + '>' + esc(D.CARDS[c]) + '</b></div></div></div></div></div>';
+        '<div class="eb"></div><div class="ef" data-card="' + esc(D.CARDS[c]) + '">' +
+        (src ? '<img class="eart" alt="" src="' + src + '" draggable="false">' : '<div class="eart none"></div>') +
+        '<div class="plate">' + esc(plateText(D, c)) + '</div></div></div></div></div>';
     });
-    h += '<div class="stampwrap"><div class="stamp"' + st(5) + '>' + (g.over.byDefault ? 'Closed' : 'Solved') + '</div></div></div></div></div></div>';
+    h += '<div class="stampwrap"><div class="stamp"' + st(5) + '>' + (g.over.byDefault ? 'Closed' : 'Solved') + '</div></div></div></div></div>';
     h += '<div class="fin-actions"' + st(5.9) + '>' + (isHost()
       ? '<button class="btn grow" data-act="again">Play again</button><button class="btn ghost grow" data-act="home">Home</button>'
       : '<button class="btn grow" data-act="home">Home</button>') + '</div>';

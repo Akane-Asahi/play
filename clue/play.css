@@ -46,32 +46,36 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 .bigcard.shownc:not(.art){border:2px solid var(--accent);background:var(--bg);justify-content:center;aspect-ratio:.62}
 
 /* ---- case closed finale ---- */
-.card.finale{padding:14px 12px 16px;overflow:hidden}
+.card.finale{padding:14px 10px 16px;overflow:hidden;border-color:#2d3a36;background:#1a2624 url(img/table.webp) center/cover no-repeat}
 .fin{text-align:center}
 .fin-top{min-height:146px}
-.fin-name{font-size:42px;font-weight:850;line-height:1.1;letter-spacing:1px;text-transform:uppercase;margin:4px 0 0;animation:namein .45s cubic-bezier(.2,1.4,.4,1) calc(var(--d) - var(--t)) both}
+.fin .muted{color:#b9b09a}
+.fin-name{font-size:42px;font-weight:850;line-height:1.1;letter-spacing:1px;text-transform:uppercase;margin:4px 0 0;color:#f3ead4;text-shadow:0 2px 10px rgba(0,0,0,.6);animation:namein .45s cubic-bezier(.2,1.4,.4,1) calc(var(--d) - var(--t)) both}
 @keyframes namein{from{opacity:0;transform:scale(1.5)}to{opacity:1;transform:none}}
-.folder{position:relative;margin:6px 0 4px;animation:folderin .6s ease-out calc(0s - var(--t)) both}
+.fin-stars{width:150px;height:68px;margin:6px auto 0;background:url(img/stars.webp) center/contain no-repeat;animation:starsin .7s cubic-bezier(.2,1.5,.4,1) calc(var(--d) - var(--t)) both}
+@keyframes starsin{0%{opacity:0;transform:scale(.2) rotate(-14deg)}100%{opacity:1;transform:none}}
+.folder{position:relative;margin:4px auto;max-width:560px;animation:folderin .6s ease-out calc(0s - var(--t)) both}
 @keyframes folderin{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
-.fshake{position:relative;padding-top:24px;animation:thud .45s linear calc(var(--d) - var(--t)) both}
+.fshake{position:relative;animation:thud .45s linear calc(var(--d) - var(--t)) both}
 @keyframes thud{0%{transform:none}20%{transform:translate(-4px,5px)}40%{transform:translate(5px,-3px)}60%{transform:translate(-3px,2px)}80%{transform:translate(2px,-1px)}100%{transform:none}}
-.ftab{position:absolute;top:0;left:14px;width:36%;height:26px;line-height:28px;background:#d3bf92;color:#7d6c46;border-radius:10px 10px 0 0;font-size:10.5px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
-.fbody{position:relative;background:linear-gradient(165deg,#efe0bb 0%,#dcc99d 60%,#d2bd8e 100%);border-radius:4px 16px 16px 16px;padding:22px 10px 26px;box-shadow:0 18px 34px -6px rgba(0,0,0,.65),inset 0 0 0 1px rgba(255,255,255,.4),inset 0 -14px 24px rgba(120,90,40,.18)}
-.fbody::before{content:'';position:absolute;inset:0;border-radius:inherit;background:repeating-linear-gradient(94deg,rgba(255,255,255,.05) 0 2px,rgba(120,90,40,.04) 2px 4px);pointer-events:none}
-.fcards{position:relative;height:262px;max-width:340px;margin:0 auto}
-.epos{position:absolute;top:4px;width:37%;aspect-ratio:.62}
-.epos.p0{left:31.5%;z-index:4}
-.epos.p1{left:62%;z-index:2;transform:rotate(8deg) translateY(8px)}
-.epos.p2{left:1.5%;z-index:3;transform:rotate(-8deg) translateY(8px)}
+/* the open case file: cards are placed in percentages of the folder picture */
+.fbox{position:relative;aspect-ratio:1137/777;container-type:inline-size;background:url(img/folder.webp) center/100% 100% no-repeat;filter:drop-shadow(0 14px 18px rgba(0,0,0,.55))}
+.epos{position:absolute}
+.epos.p0{left:38.3%;top:15.1%;width:23.4%;height:52.6%;z-index:5;--pl:-12.5%}
+.epos.p1{left:58.6%;top:24.6%;width:26.4%;height:56.4%;z-index:2;--pl:30%}
+.epos.p2{left:15.1%;top:24.2%;width:27.5%;height:56.9%;z-index:3;--pl:-10.6%}
 .ec{position:absolute;inset:0;perspective:900px;animation:dealin .5s ease-out calc(var(--d) - var(--t)) both}
 @keyframes dealin{from{opacity:0;transform:translateY(-34px)}to{opacity:1;transform:none}}
 .ecin{position:absolute;inset:0;transform-style:preserve-3d;animation:flipc .9s ease-in-out calc(var(--d) - var(--t)) both}
 @keyframes flipc{0%{transform:rotateY(0) scale(1)}50%{transform:rotateY(90deg) scale(1.1)}100%{transform:rotateY(180deg) scale(1)}}
-.eb,.ec .ef.fc{position:absolute;top:0;left:0;right:0;bottom:0;width:auto;aspect-ratio:auto;border-radius:16px;-webkit-backface-visibility:hidden;backface-visibility:hidden;box-shadow:0 10px 22px -6px rgba(0,0,0,.55)}
-.eb{background:#fb6759 url(img/cardback.webp) center/100% 100% no-repeat}
-.ec .ef.fc{transform:rotateY(180deg);animation:none}
-.stampwrap{position:absolute;inset:0;display:flex;align-items:flex-start;padding-top:78px;justify-content:center;pointer-events:none;z-index:9}
-.stamp{font-size:46px;font-weight:900;letter-spacing:5px;text-transform:uppercase;color:#d32f2f;border:6px solid #d32f2f;border-radius:10px;padding:2px 16px 0;background:transparent;text-shadow:0 1px 4px rgba(0,0,0,.55);box-shadow:inset 0 0 0 2px rgba(211,47,47,.35);mix-blend-mode:normal;animation:slam .5s cubic-bezier(.2,.9,.3,1) calc(var(--d) - var(--t)) both}
+.eb,.ef{position:absolute;inset:0;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+.eb{background:#fb6759 url(img/cardback.webp) center/100% 100% no-repeat;border-radius:3px;box-shadow:0 6px 14px -2px rgba(0,0,0,.55)}
+.ef{transform:rotateY(180deg)}
+.eart{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;box-shadow:0 6px 14px -2px rgba(0,0,0,.6)}
+.eart.none{background:#2a2622}
+.plate{position:absolute;left:var(--pl);bottom:8.5%;width:max-content;background:#000;color:#d9cfb6;border:max(1.5px,.35cqw) solid #efe6cf;padding:.9cqw 2cqw .7cqw;font:500 3.1cqw/1.25 ui-monospace,'SF Mono','Courier New',monospace;letter-spacing:.05em;white-space:nowrap;box-shadow:0 3px 8px rgba(0,0,0,.5)}
+.stampwrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-bottom:4%;pointer-events:none;z-index:9}
+.stamp{font-size:11cqw;font-weight:900;letter-spacing:.11em;text-transform:uppercase;color:#d32f2f;border:max(4px,1.5cqw) solid #d32f2f;border-radius:.9cqw;padding:.3cqw 3cqw 0;background:transparent;text-shadow:0 1px 4px rgba(0,0,0,.55);box-shadow:inset 0 0 0 2px rgba(211,47,47,.35);animation:slam .5s cubic-bezier(.2,.9,.3,1) calc(var(--d) - var(--t)) both}
 @keyframes slam{0%{opacity:0;transform:rotate(-12deg) scale(3.6)}55%{opacity:1;transform:rotate(-12deg) scale(.9)}75%{transform:rotate(-12deg) scale(1.06)}100%{opacity:1;transform:rotate(-12deg) scale(1)}}
 .fin-actions{display:flex;gap:10px;margin-top:6px;animation:finalup .5s ease-out calc(var(--d) - var(--t)) both}
 .fin-actions .btn{margin-top:12px}
@@ -79,9 +83,6 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 @keyframes finalup{0%{opacity:0;visibility:hidden;transform:translateY(10px)}1%{visibility:visible}100%{opacity:1;visibility:visible;transform:none}}
 .fin.freeze *{animation-play-state:paused!important}
 @media (prefers-reduced-motion:reduce){.fin *{animation-duration:.01s!important;animation-delay:0s!important}}
-
-.fin-stars{width:150px;height:68px;margin:6px auto 0;background:url(img/stars.webp) center/contain no-repeat;animation:starsin .7s cubic-bezier(.2,1.5,.4,1) calc(var(--d) - var(--t)) both}
-@keyframes starsin{0%{opacity:0;transform:scale(.2) rotate(-14deg)}100%{opacity:1;transform:none}}
 /* hand-filled notes sheet */
 .nscroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
 .nt.manual td.mk{white-space:nowrap;padding:5px 2px}

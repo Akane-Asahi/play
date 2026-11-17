@@ -89,7 +89,7 @@ async function play(db, cs, code, plan, until) {
   cs.forEach((c) => {
     const wname = db.read('rooms/' + code + '/players/' + g.over.winner).name;
     assert(c.q('.stamp').textContent === 'Solved' && c.q('.fin-stars') && c.q('.fin-name').textContent === wname, 'finale: name, stars and SOLVED stamp');
-    const names = c.qa('.ec .ef b').map((b) => b.textContent).sort(), D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
+    const names = c.qa('.ec .ef').map((b) => b.dataset.card).sort(), D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
     assert.deepEqual(names, env.map((x) => D0.CARDS[x]).sort(), 'finale shows the three envelope cards');
     assert(c.qa('.ecin').length === 3 && c.q('[data-act=home]'), 'folder with three cards and a Home button');
     assert.equal(c.qa('table.tt tr.r').length, g.log.length, 'turn log shows every entry');
