@@ -417,7 +417,7 @@ export function startApp({ net, doc, win, delays }) {
     h += '<div class="fin-top"><div class="muted">' + (g.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div>' +
       '<div class="fin-name"' + st(5.1) + '>' + esc(nmFull(w)) + '</div>' +
       '<div class="fin-stars" role="img" aria-label="Three stars"' + st(5.35) + '></div></div>';
-    h += '<div class="folder"><div class="fshake"' + st(5) + '><div class="fbox">';
+    h += '<div class="folder"><div class="fshake"' + st(5) + '><div class="fbox"><div class="ftag">Case #' + esc(roomCode) + '</div>';
     cards.forEach((c, k) => {
       const src = portrait(D, c);
       h += '<div class="epos p' + k + '"><div class="ec"' + st(0.3 + 0.15 * k) + '><div class="ecin"' + st(at[k]) + '>' +
