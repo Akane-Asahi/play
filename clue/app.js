@@ -349,16 +349,38 @@ export function startApp({ net, doc, win, delays }) {
     return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.</b><br>' + esc(cards) + '</div>';
   }
 
+  // The case-closed finale: an open case file, three folded cards turned one at a time
+  // (room, weapon, suspect), then WINNER is stamped on. Timing comes from --t (seconds since it
+  // started), so a re-render in the middle of it carries on instead of starting over.
+  function finaleHtml(D) {
+    const g = game, w = g.over.winner;
+    const key = (meta.startedAt || 0) + ':' + w;
+    if (!ui.finale || ui.finale.key !== key) ui.finale = { key, at: Date.now() };
+    const frozen = D0.reveal != null;
+    const t = frozen ? D0.reveal : (Date.now() - ui.finale.at) / 1000;
+    const st = (d) => ' style="--d:' + d + 's;--t:' + t.toFixed(2) + 's"';
+    const cards = g.over.envelope.slice().sort((a, b) => a - b);          // suspect, weapon, room
+    const at = [3.7, 2.5, 1.3];                                           // room first, then weapon, then suspect
+    let h = '<div class="fin' + (frozen ? ' freeze' : '') + '" style="--t:' + t.toFixed(2) + 's">';
+    h += '<div class="fin-top"><div class="muted">' + (g.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div>' +
+      '<div class="fin-name"' + st(5.1) + '>' + esc(nmFull(w)) + '</div></div>';
+    h += '<div class="folder"><div class="fshake"' + st(5) + '><div class="ftab">Case file</div><div class="fbody"><div class="fcards">';
+    cards.forEach((c, k) => {
+      const src = portrait(D, c);
+      h += '<div class="epos p' + k + '"><div class="ec"' + st(0.3 + 0.15 * k) + '><div class="ecin"' + st(at[k]) + '>' +
+        '<div class="eb"></div><div class="fc live ef' + (src ? ' art' : '') + '"><div class="in">' + (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
+        '<small>' + S.CAT_NAMES[k] + '</small><b' + (D.CARDS[c].length > 10 ? ' class="long"' : '') + '>' + esc(D.CARDS[c]) + '</b></div></div></div></div></div>';
+    });
+    h += '<div class="stampwrap"><div class="stamp"' + st(5) + '>Winner</div></div></div></div></div></div>';
+    h += '<div class="fin-actions"' + st(5.9) + '>' + (isHost()
+      ? '<button class="btn grow" data-act="again">Play again</button><button class="btn ghost grow" data-act="home">Home</button>'
+      : '<button class="btn grow" data-act="home">Home</button>') + '</div>';
+    if (!isHost()) h += '<p class="muted center fin-wait"' + st(5.9) + '>Or wait for ' + esc(nmFull(meta.host)) + ' to start another game.</p>';
+    return h + '</div>';
+  }
+
   function actionHtml(D) {
     const g = game, me = uid;
-    if (g.over) {
-      const w = g.over.winner;
-      let h = '<div class="ask"><div class="muted">' + (g.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div><div class="who">' + (w === me ? 'You win!' : esc(nmFull(w)) + ' wins') + '</div><div class="muted">The envelope held</div></div>';
-      h += fan(D, g.over.envelope.slice().sort((a, b) => a - b));
-      if (isHost()) h += '<button class="btn" data-act="again">Back to the lobby for a new game</button>';
-      else h += '<p class="muted center">' + esc(nmFull(meta.host)) + ' can start a new game.</p>';
-      return h;
-    }
     if (g.phase === 'answer' && g.cur) {
       const cur = g.cur, who = E.asked(g), iAsk = cur.by === me, meAsked = who === me;
       let h = respPills(cur) + '<div class="ask"><div class="muted">' + (iAsk ? 'You\'re asking' : esc(nm(cur.by)) + ' is asking') + '</div><div class="who">' + esc(nm(who)) + '</div><div class="muted">';
@@ -419,7 +441,7 @@ export function startApp({ net, doc, win, delays }) {
       const e = log[n], sh = myShown && myShown[n];
       const cell = (c) => '<td>' + cardHtml(D, c) + (e.t === 's' && sh && sh.card === c ? '&nbsp;👁️' : '') + '</td>';
       let ans, note = '';
-      if (e.t === 'a') ans = '<span class="muted">Accused: ' + (e.ok ? 'right' : 'wrong') + '</span>';
+      if (e.t === 'a') ans = '<span class="muted">Accused ' + (e.ok ? '✓' : '✗') + '</span>';
       else {
         const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed');
         ans = shower ? tag(shower.p) : '<span class="muted">Nobody</span>';
@@ -435,6 +457,7 @@ export function startApp({ net, doc, win, delays }) {
   function gameHtml() {
     if (!game) return '<p class="muted center">Dealing…</p>';
     const D = deck(), ord = order();
+    if (game.over) return '<section class="card finale">' + finaleHtml(D) + '</section>' + turnsHtml(D);
     let h = '<section class="card act">' + actionHtml(D) + '</section>';
     h += '<section class="card"><h2>Your cards</h2><div class="chips">' +
       (myHand && myHand.length ? myHand.map((c) => chip(D, c, ' still')).join('') : '<span class="muted">Dealing…</span>') + '</div></section>';

@@ -7,12 +7,12 @@
 <main><div id="view"></div><p id="msg" class="warn center" role="status"></p></main>
 <script src="../clue/portraits.js"></script><script src="../clue/solver.js"></script>
 <script type="module">
-// Local preview without Firebase: ?step=home|lobby|turn|asked|watch|result|end  (bots: Sir, Bebun, Dada)
+// Local preview without Firebase: ?step=home|lobby|turn|asked|watch|result|end (end: add &t=seconds to freeze the finale at that moment)  (bots: Sir, Bebun, Dada)
 import { startApp } from '../clue/app.js';
 import { FakeDb } from './fake-net.js';
-const step = new URLSearchParams(location.search).get('step') || 'turn';
+const qs = new URLSearchParams(location.search), step = qs.get('step') || 'turn', reveal = qs.get('t');
 const db = new FakeDb(), wait = (ms) => new Promise((r) => setTimeout(r, ms));
-startApp({ net: db.client('me'), doc: document, win: window, delays: { bot: step === 'end' ? 0 : step === 'watch' ? 400 : 150, none: 150 } });
+startApp({ net: db.client('me'), doc: document, win: window, delays: { bot: step === 'end' ? 0 : step === 'watch' ? 400 : 150, none: 150, reveal: reveal == null ? undefined : +reveal } });
 const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); return !!el; };
 (async () => {
   if (step === 'home') return;

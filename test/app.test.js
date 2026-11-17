@@ -85,12 +85,16 @@ async function play(db, cs, code, plan, until) {
   await wait(20);
   assert.deepEqual(g.over.envelope.slice().sort(), env.slice().sort());
   cs.forEach((c) => {
-    assert(c.text().includes(g.over.winner === c.uid ? 'You win!' : 'wins'), 'end screen');
+    const wname = db.read('rooms/' + code + '/players/' + g.over.winner).name;
+    assert(c.q('.stamp') && c.q('.fin-name').textContent === wname, 'finale names the winner');
+    const names = c.qa('.ec .ef b').map((b) => b.textContent).sort(), D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
+    assert.deepEqual(names, env.map((x) => D0.CARDS[x]).sort(), 'finale shows the three envelope cards');
+    assert(c.qa('.ecin').length === 3 && c.q('[data-act=home]'), 'folder with three cards and a Home button');
     assert.equal(c.qa('table.tt tr.r').length, g.log.length, 'turn log shows every entry');
   });
   // a reload of a guest goes straight back into the game
   const again = open(db, 'h2', '?room=' + code); await wait(20);
-  assert(again.text().includes('The envelope held'), 'rejoin after reload');
+  assert(again.q('.stamp'), 'rejoin after reload shows the finale');
   // host starts over
   cs[0].click('[data-act=again]'); await wait(20);
   assert(cs[1].text().includes('Waiting for Hosty'), 'back in the lobby');
@@ -106,7 +110,8 @@ async function play(db, cs, code, plan, until) {
   const g = await play(db, cs, code, (c) => (c.uid === 'h1' ? { cards: env, accuse: true } : null));
   await wait(10);
   assert.equal(g.over.winner, 'h1'); assert(!g.over.byDefault);
-  assert(cs[0].text().includes('You win!') && cs[1].text().includes('Hosty wins'));
+  assert(cs[0].q('.fin-name').textContent === 'Hosty' && cs[1].q('.fin-name').textContent === 'Hosty', 'everyone sees who won');
+  assert(cs[0].q('[data-act=again]') && !cs[1].q('[data-act=again]'), 'only the host can start again');
   console.log('B ok: correct accusation wins');
 }
 
