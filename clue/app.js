@@ -651,7 +651,13 @@ export function startApp({ net, doc, win, delays }) {
   function gameHtml() {
     if (!game) return '<p class="muted center">Dealing…</p>';
     const D = deck(), ord = order();
-    if (game.over) return '<section class="card finale">' + finaleHtml(D) + '</section>' + turnsHtml(D);
+    if (game.over) {                                                          // the finale is a pop-up over the table
+      const closed = ui.finaleClosed === (meta.startedAt || 0) + ':' + game.over.winner;
+      const bar = '<section class="card finbar"><div class="muted">' + (game.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div><div class="who">' + esc(nmFull(game.over.winner)) + '</div>' +
+        '<div class="row"><button class="btn grow" data-act="finale-open">Show result</button>' + (isHost() ? '<button class="btn ghost grow" data-act="again">Play again</button>' : '') + '<button class="btn ghost grow" data-act="home">Home</button></div></section>';
+      return (closed ? bar : '') + boardHtml(D) + turnsHtml(D) +
+        (closed ? '' : '<div class="modal"><div class="mcard finale" role="dialog" aria-modal="true"><button class="mclose" data-act="finale-close" aria-label="Close">×</button>' + finaleHtml(D) + '</div></div>');
+    }
     const key = String(meta.startedAt || 0), log = E.logOf(game);
     if (ui.seenKey !== key) { ui.seenKey = key; ui.seen = log.length; }       // only what happens from now on
     if (full() && game.turn === uid && game.phase === 'suggest') {          // the room I walked into is already chosen
@@ -724,6 +730,8 @@ export function startApp({ net, doc, win, delays }) {
       case 'home': win.location.href = win.location.pathname; break;
       case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
       case 'next': ui.seen++; render(); break;
+      case 'finale-close': ui.finaleClosed = (meta.startedAt || 0) + ':' + game.over.winner; render(); break;
+      case 'finale-open': ui.finaleClosed = null; render(); break;
       case 'players': ui.plOpen = !ui.plOpen; render(); break;
       case 'pexp': ui.plExp[el.dataset.p] = !ui.plExp[el.dataset.p]; render(); break;
       case 'suggest': run(doSuggest); break;
