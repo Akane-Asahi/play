@@ -20,7 +20,7 @@ export function startApp({ net, doc, win, delays }) {
   let meta = null, players = {}, game = null, myHand = null, myShown = null;
   let unsubs = [];
   let msg = '';
-  const ui = { sel: [null, null, null], accusing: false, confirm: false, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
+  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
   let autoKey = null, hostBusy = false, hostDirty = false, helperKey = null, helperRes = null;
 
   // ---------- helpers ----------
@@ -122,8 +122,10 @@ export function startApp({ net, doc, win, delays }) {
     enterRoom(code);
   }
 
+  const notesKey = () => 'clues-notes-' + roomCode + '-' + uid;
   function enterRoom(code) {
     roomCode = code;
+    try { ui.notes = JSON.parse(lsGet('clues-notes-' + code + '-' + uid) || '{}') || {}; } catch (e) { ui.notes = {}; }
     try {
       const url = new win.URL(win.location.href);
       url.searchParams.set('room', code);
@@ -258,8 +260,9 @@ export function startApp({ net, doc, win, delays }) {
   }
 
   // ---------- my notes (the deduction helper) ----------
+  const isTelot = () => /^telot$/i.test(((players[uid] && players[uid].name) || '').trim());
   function helper() {
-    if (!meta || !meta.helper || !game || !myHand || !players[uid] || players[uid].handSize == null) return null;
+    if (!isTelot() || !game || !myHand || !players[uid] || players[uid].handSize == null) return null;
     const key = E.logOf(game).length + '|' + JSON.stringify(myShown || {}) + '|' + myHand.join(',');
     if (key !== helperKey) {
       helperKey = key;
@@ -297,7 +300,7 @@ export function startApp({ net, doc, win, delays }) {
       h += '<section class="card"><h2>Add bots</h2><div class="chips">' +
         (free.length ? free.map((n) => '<span class="chip' + (full ? ' off' : '') + '" data-act="bot" data-n="' + esc(n) + '">+ ' + esc(n) + '</span>').join('') : '<span class="muted">All six bots are in.</span>') +
         '</div><p class="muted">Bots play on your device, so keep this page open during the game.</p></section>';
-      h += '<section class="card"><div class="switch"><div><b>Notes for everyone</b><div class="muted">Each player gets a notes table that works out what they can know from their own cards and the turns.</div></div>' +
+      h += '<section class="card"><div class="switch"><div><b>Notes sheet for everyone</b><div class="muted">Each player gets a sheet to tick and cross by hand as they work out the case.</div></div>' +
         '<button class="tog' + (meta.helper ? ' on' : '') + '" data-act="helper" aria-label="Toggle notes"></button></div></section>';
       h += '<button class="btn" data-act="start"' + (ord.length < E.MIN_PLAYERS ? ' disabled' : '') + '>Start game</button>' +
         (ord.length < E.MIN_PLAYERS ? '<p class="muted center">You need at least ' + E.MIN_PLAYERS + ' players. Add a bot or invite a friend.</p>' : '');
@@ -363,7 +366,8 @@ export function startApp({ net, doc, win, delays }) {
     const at = [3.7, 2.5, 1.3];                                           // room first, then weapon, then suspect
     let h = '<div class="fin' + (frozen ? ' freeze' : '') + '" style="--t:' + t.toFixed(2) + 's">';
     h += '<div class="fin-top"><div class="muted">' + (g.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div>' +
-      '<div class="fin-name"' + st(5.1) + '>' + esc(nmFull(w)) + '</div></div>';
+      '<div class="fin-name"' + st(5.1) + '>' + esc(nmFull(w)) + '</div>' +
+      '<div class="fin-stars" role="img" aria-label="Three stars"' + st(5.35) + '></div></div>';
     h += '<div class="folder"><div class="fshake"' + st(5) + '><div class="ftab">Case file</div><div class="fbody"><div class="fcards">';
     cards.forEach((c, k) => {
       const src = portrait(D, c);
@@ -371,7 +375,7 @@ export function startApp({ net, doc, win, delays }) {
         '<div class="eb"></div><div class="fc live ef' + (src ? ' art' : '') + '"><div class="in">' + (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
         '<small>' + S.CAT_NAMES[k] + '</small><b' + (D.CARDS[c].length > 10 ? ' class="long"' : '') + '>' + esc(D.CARDS[c]) + '</b></div></div></div></div></div>';
     });
-    h += '<div class="stampwrap"><div class="stamp"' + st(5) + '>Winner</div></div></div></div></div></div>';
+    h += '<div class="stampwrap"><div class="stamp"' + st(5) + '>' + (g.over.byDefault ? 'Closed' : 'Solved') + '</div></div></div></div></div></div>';
     h += '<div class="fin-actions"' + st(5.9) + '>' + (isHost()
       ? '<button class="btn grow" data-act="again">Play again</button><button class="btn ghost grow" data-act="home">Home</button>'
       : '<button class="btn grow" data-act="home">Home</button>') + '</div>';
@@ -413,9 +417,31 @@ export function startApp({ net, doc, win, delays }) {
     return h;
   }
 
+  // The notes sheet everyone gets: a tick or a cross per card and player, filled in by hand.
+  function manualNotesHtml(D) {
+    if (!meta.helper || !myHand) return '';
+    const others = order().filter((p) => p !== uid);
+    const rd = (c, o, v, on) => '<button class="rd ' + v + (on ? ' on' : '') + '" role="radio" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + (v === 'y' ? 'Has it' : 'Does not have it') + '" data-act="mark" data-c="' + c + '" data-o="' + o + '" data-v="' + v + '">' + (v === 'y' ? '✓' : '✕') + '</button>';
+    let h = '<section class="card"><h2>Your notes</h2><div class="nscroll"><table class="nt manual"><thead><tr><th></th><th>Envelope</th>' +
+      others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
+    [0, 1, 2].forEach((k) => {
+      h += '<tr class="cat"><td colspan="' + (2 + others.length) + '">' + S.CAT_PLURAL[k] + '</td></tr>';
+      for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
+        const mine = myHand.includes(c);
+        h += '<tr class="' + (mine ? 'mine' : '') + '"><td>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') + '</td>';
+        ['env'].concat(others).forEach((o) => {
+          const v = ui.notes[c + ':' + o];
+          h += mine ? '<td class="n">–</td>' : '<td class="mk">' + rd(c, o, 'y', v === 'y') + rd(c, o, 'n', v === 'n') + '</td>';
+        });
+        h += '</tr>';
+      }
+    });
+    return h + '</tbody></table></div><p class="muted">Tap ✓ if they have the card (or it is in the envelope), ✕ if they don\'t. Tap again to clear.</p></section>';
+  }
+
   function notesHtml(D) {
     const r = helper();
-    if (!r) return '';
+    if (!r) return isTelot() ? '' : manualNotesHtml(D);
     const ord = order(), E_ = r.nP, others = ord.filter((p) => p !== uid);
     let h = '<section class="card"><h2>Your notes</h2>';
     if (r.solved) h += '<div class="banner solvedb"><b>Solved:</b> ' + r.envelope.map((l) => esc(D.CARDS[l[0].card])).join(' · ') + '</div>';
@@ -521,6 +547,12 @@ export function startApp({ net, doc, win, delays }) {
       case 'accuse-back': resetPick(); render(); break;
       case 'end': run(doEndTurn); break;
       case 'show': run(() => showCard(+el.dataset.c)); break;
+      case 'mark': {
+        const key = el.dataset.c + ':' + el.dataset.o;
+        if (ui.notes[key] === el.dataset.v) delete ui.notes[key]; else ui.notes[key] = el.dataset.v;
+        lsSet(notesKey(), JSON.stringify(ui.notes));
+        render(); break;
+      }
       default: break;
     }
   });

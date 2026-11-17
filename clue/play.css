@@ -48,7 +48,7 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 /* ---- case closed finale ---- */
 .card.finale{padding:14px 12px 16px;overflow:hidden}
 .fin{text-align:center}
-.fin-top{min-height:84px}
+.fin-top{min-height:146px}
 .fin-name{font-size:42px;font-weight:850;line-height:1.1;letter-spacing:1px;text-transform:uppercase;margin:4px 0 0;animation:namein .45s cubic-bezier(.2,1.4,.4,1) calc(var(--d) - var(--t)) both}
 @keyframes namein{from{opacity:0;transform:scale(1.5)}to{opacity:1;transform:none}}
 .folder{position:relative;margin:6px 0 4px;animation:folderin .6s ease-out calc(0s - var(--t)) both}
@@ -79,3 +79,13 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 @keyframes finalup{0%{opacity:0;visibility:hidden;transform:translateY(10px)}1%{visibility:visible}100%{opacity:1;visibility:visible;transform:none}}
 .fin.freeze *{animation-play-state:paused!important}
 @media (prefers-reduced-motion:reduce){.fin *{animation-duration:.01s!important;animation-delay:0s!important}}
+
+.fin-stars{width:150px;height:68px;margin:6px auto 0;background:url(img/stars.webp) center/contain no-repeat;animation:starsin .7s cubic-bezier(.2,1.5,.4,1) calc(var(--d) - var(--t)) both}
+@keyframes starsin{0%{opacity:0;transform:scale(.2) rotate(-14deg)}100%{opacity:1;transform:none}}
+/* hand-filled notes sheet */
+.nscroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
+.nt.manual td.mk{white-space:nowrap;padding:5px 2px}
+.rd{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:none;color:var(--mute);font-size:12px;line-height:1;padding:0;margin:0 1px;cursor:pointer;vertical-align:middle;-webkit-tap-highlight-color:transparent}
+.rd.y.on{background:var(--ok);border-color:var(--ok);color:#10200f}
+.rd.n.on{background:var(--bad);border-color:var(--bad);color:#2a0f0d}
+.nt.manual tr.mine td.n{opacity:.5}

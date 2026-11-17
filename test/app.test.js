@@ -21,10 +21,11 @@ function open(db, uid, query) {
 }
 const clean = (cs) => cs.forEach((c) => assert.equal(c.msg(), '', c.uid + ' sees: ' + c.msg()));
 
-async function lobby(db, humans, bots) {
+async function lobby(db, humans, bots, names) {
+  names = names || {};
   const host = open(db, humans[0]);
   await wait(5);
-  host.type('name', 'Hosty'); host.click('[data-act=create]'); await wait(10);
+  host.type('name', names[humans[0]] || 'Hosty'); host.click('[data-act=create]'); await wait(10);
   const code = host.app.state().roomCode;
   assert.match(code, /^[A-Z0-9]{5}$/);
   assert(host.q('#share').value.endsWith('?room=' + code));
@@ -33,7 +34,7 @@ async function lobby(db, humans, bots) {
     const c = open(db, h + '-fresh', '?room=' + code); await wait(5);       // not in the room yet: sees the join form
     assert(c.q('#code').value === code, 'code prefilled from the link');
     const real = open(db, h, '?room=' + code); await wait(5);
-    real.type('name', 'P-' + h); real.click('[data-act=join]'); await wait(10);
+    real.type('name', names[h] || 'P-' + h); real.click('[data-act=join]'); await wait(10);
     cs.push(real);
   }
   assert(host.q('[data-act=start]').disabled === (humans.length < 3));
@@ -80,13 +81,14 @@ async function play(db, cs, code, plan, until) {
   const hands = db.read('rooms/' + code + '/hands'), env = db.read('rooms/' + code + '/secret/envelope');
   assert.equal(Object.keys(hands).length, 4);
   cs.forEach((c) => assert.deepEqual(c.app.state().myHand, hands[c.uid], 'each player sees exactly their own hand'));
-  assert(cs[1].text().includes('Your cards') && cs[1].q('table.nt'), 'game screen with notes');
+  assert(cs[1].text().includes('Your cards') && cs[1].q('table.nt.manual') && cs[1].q('.rd'), 'game screen with a hand-filled notes sheet');
+  assert(!cs[1].q('.nt .pc'), 'no calculated percentages for other names');
   const g = await play(db, cs, code);
   await wait(20);
   assert.deepEqual(g.over.envelope.slice().sort(), env.slice().sort());
   cs.forEach((c) => {
     const wname = db.read('rooms/' + code + '/players/' + g.over.winner).name;
-    assert(c.q('.stamp') && c.q('.fin-name').textContent === wname, 'finale names the winner');
+    assert(c.q('.stamp').textContent === 'Solved' && c.q('.fin-stars') && c.q('.fin-name').textContent === wname, 'finale: name, stars and SOLVED stamp');
     const names = c.qa('.ec .ef b').map((b) => b.textContent).sort(), D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
     assert.deepEqual(names, env.map((x) => D0.CARDS[x]).sort(), 'finale shows the three envelope cards');
     assert(c.qa('.ecin').length === 3 && c.q('[data-act=home]'), 'folder with three cards and a Home button');
@@ -160,6 +162,49 @@ async function play(db, cs, code, plan, until) {
   assert(big && big.textContent.includes(D.CARDS[sh.card]), 'asker sees the card drawn');
   assert(!cs[1].q('.bigcard.shownc') && !cs[2].q('.bigcard.shownc'), 'other players do not see it');
   console.log('D ok: asker sees the shown card as a card');
+}
+
+// E: a bot shows a guest a card: the guest sees it drawn as a card
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2'], ['Sir']);
+  const D = S.makeDeck(S.EDITIONS[0]);
+  const sir = db.read('rooms/' + code + '/hands/bot-sir'), h1 = db.read('rooms/' + code + '/hands/h1');
+  const k = [0, 1, 2].find((x) => sir.some((c) => D.catOf(c) === x));
+  const cards = [0, 1, 2].map((x) => (x === k ? sir.find((c) => D.catOf(c) === x) : D.CS[x] + (h1.some((c) => c === D.CS[x]) ? 1 : 0)));
+  await play(db, cs, code, (c) => (c.uid === 'h2' ? { cards } : null), (x) => x.phase === 'end' && x.turn === 'h2');
+  await wait(20);
+  assert(cs[1].q('.bigcard.shownc'), 'guest asker sees the card a bot showed');
+  console.log('E ok: bot-shown card is drawn for a non-host asker');
+}
+
+// F: only a player named Telot gets the calculated table; everyone else ticks and crosses by hand
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h2: ' telot ' });
+  const [host, tel, other] = cs;
+  assert(tel.q('table.nt:not(.manual)') && tel.q('.nt .pc') && !tel.q('.rd'), 'Telot sees the calculation');
+  assert(!other.q('.nt .pc') && other.q('.rd') && !host.q('.nt .pc'), 'others see only the hand-filled sheet');
+  const cellOf = (b) => b.dataset.c + ':' + b.dataset.o;
+  const ticks = () => other.qa('.rd.y.on').map(cellOf), crosses = () => other.qa('.rd.n.on').map(cellOf);
+  const A = other.qa('.rd.y')[0], B = other.qa('.rd.n')[1];
+  assert.notEqual(cellOf(A), cellOf(B));
+  const Ac = cellOf(A), Bc = cellOf(B);                // the page redraws after each tap, so look the buttons up again
+  other.click(A); other.click(other.qa('.rd.n').find((x) => cellOf(x) === Bc));
+  assert.deepEqual([ticks(), crosses()], [[Ac], [Bc]], 'a tick and a cross on different cells');
+  assert.equal(other.q('.rd.y.on').getAttribute('aria-checked'), 'true');
+  other.click(other.qa('.rd.n').find((x) => cellOf(x) === cellOf(A)));
+  assert.deepEqual([ticks(), crosses()], [[], [Bc, Ac].sort()], 'a cross replaces the tick on the same cell');
+  other.click(other.qa('.rd.n').find((x) => cellOf(x) === Ac));
+  assert.deepEqual(crosses(), [Bc], 'tapping again clears it');
+  const saved = JSON.parse(other.win.localStorage.getItem('clues-notes-' + code + '-h3'));
+  assert.deepEqual(saved, { [Bc]: 'n' }, 'notes saved on the device');
+  // reloading the page on the same device keeps them
+  const again = open(db, 'h3', '?room=' + code);
+  again.win.localStorage.setItem('clues-notes-' + code + '-h3', JSON.stringify(saved));
+  await wait(20);
+  assert.deepEqual(again.qa('.rd.n.on').map(cellOf), [Bc], 'notes come back after a reload');
+  console.log('F ok: Telot gets the calculation, others get a hand-filled sheet');
 }
 console.log('app tests ok');
 process.exit(0);

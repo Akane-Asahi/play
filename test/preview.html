@@ -17,7 +17,7 @@ const click = (sel) => { const el = document.querySelector(sel); if (el) el.clic
 (async () => {
   if (step === 'home') return;
   await wait(50);
-  const n = document.getElementById('name'); n.value = 'Telot'; n.dispatchEvent(new Event('input', { bubbles: true }));
+  const n = document.getElementById('name'); n.value = qs.get('name') || 'Telot'; n.dispatchEvent(new Event('input', { bubbles: true }));
   click('[data-act=create]'); await wait(50);
   for (const b of ['Sir', 'Bebun', 'Dada']) { click('[data-act=bot][data-n=' + b + ']'); await wait(20); }
   if (step === 'lobby') return;

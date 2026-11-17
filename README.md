@@ -11,7 +11,7 @@ Create a room, share the link, and friends join from their own phones. Add bots 
 3. On your turn, pick a suspect, a weapon and a room and tap **Suggest**. Players are asked in seat order. The first one who holds one of the cards shows it to you, and only you see which.
 4. When you are asked and hold more than zero of the cards, tap the one to show. A 👁️ marks a card you already showed that player.
 5. After your suggestion, end your turn or make an accusation. A right accusation wins. A wrong one puts you out, but you still show cards.
-6. **Your notes** works out what you can know from your own cards and the turns. The host can switch notes off for everyone in the lobby.
+6. **Your notes** is a sheet where you tick (✓) or cross (✕) what each player holds and what is in the envelope. It is saved on your device. The host can switch it off in the lobby. A player named Telot gets a table that works out the possibilities instead.
 
 Bots and accusation checks run on the host's device, so the host keeps the page open. Anyone can reload and return through the same link.
 
