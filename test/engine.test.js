@@ -34,6 +34,32 @@ const S = loadSolver();
   assert.equal(E.suggest(g, 'a', [0, 6, 12], order), undefined);
 }
 
+// full game: rolling, moving, rooms and passages
+{
+  const B = await import('../clue/board.js');
+  const order = ['a', 'b', 'c'];
+  let g = E.newGame(order, { mode: 'full', rc0: 12 });
+  assert.equal(E.suggest(g, 'a', [0, 6, 12], order), undefined, 'cannot suggest before moving');
+  assert.equal(E.roll(g, 'b', [3, 4]), undefined); assert.equal(E.roll(g, 'a', [7, 1]), undefined);
+  g = E.roll(g, 'a', [1, 1]);
+  assert.equal(E.move(g, 'a', B.inRoom(4)), undefined, 'the middle room is too far for a 2');
+  g = E.move(g, 'a', B.inRoom(0));
+  assert.equal(g.phase, 'suggest');
+  assert.equal(E.suggest(g, 'a', [0, 6, 13], order), undefined, 'only the room you are in');
+  g = E.suggest(g, 'a', [0, 6, 12], order);
+  g = E.answer(E.answer(g, 'b', 'none'), 'c', 'none');
+  g = E.endTurn(g, 'a', order);
+  assert(g.phase === 'roll' && g.turn === 'b' && !g.dice);
+  g = E.move(E.roll(g, 'b', [1, 2]), 'b', 'stay');
+  assert(g.phase === 'end' && g.nosug);
+  g = E.endTurn(E.move(E.roll(E.endTurn(g, 'b', order), 'c', [6, 6]), 'c', 'stay'), 'c', order);
+  g = E.passage(g, 'a');
+  assert(g.phase === 'suggest' && g.pos.a === B.inRoom(8), 'kitchen passage leads to the study');
+  // a pawn in a corridor blocks the square
+  const r = B.reach({ a: B.idx(4, 0), b: B.idx(4, 1), c: B.idx(5, 0) }, 'a', 6);
+  assert.equal(r.cells.size, 0, 'boxed in');
+}
+
 // full games played by bots only
 function playGame(n, seed) {
   const ed = S.EDITIONS[seed % 2], D = S.makeDeck(ed), rng = S.mulberry32(seed);

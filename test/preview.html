@@ -18,10 +18,11 @@ const click = (sel) => { const el = document.querySelector(sel); if (el) el.clic
   if (step === 'home') return;
   await wait(50);
   const n = document.getElementById('name'); n.value = qs.get('name') || 'Telot'; n.dispatchEvent(new Event('input', { bubbles: true }));
-  click('[data-act=create]'); await wait(50);
+  click('[data-act=create]'); if (step === 'modes') return; click('[data-act=mk][data-m=' + (qs.get('mode') || 'fast') + ']'); await wait(50);
   for (const b of ['Sir', 'Bebun', 'Dada']) { click('[data-act=bot][data-n=' + b + ']'); await wait(20); }
   if (step === 'lobby') return;
   click('[data-act=start]'); await wait(100);
+  if (step === 'board') { click('[data-act=roll]'); return; }
   if (step === 'turn' || step === 'players') {
     [0, 1].forEach((k) => click('tr.pk td[data-act=pick][data-k="' + k + '"]'));
     if (step === 'players') { click('.rd.y'); click('#players-btn'); const ps = document.querySelectorAll('[data-act=pexp]'); ps.forEach((b) => b.click()); }

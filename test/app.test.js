@@ -21,11 +21,11 @@ function open(db, uid, query) {
 }
 const clean = (cs) => cs.forEach((c) => assert.equal(c.msg(), '', c.uid + ' sees: ' + c.msg()));
 
-async function lobby(db, humans, bots, names) {
+async function lobby(db, humans, bots, names, mode) {
   names = names || {};
   const host = open(db, humans[0]);
   await wait(5);
-  host.type('name', names[humans[0]] || 'Hosty'); host.click('[data-act=create]'); await wait(10);
+  host.type('name', names[humans[0]] || 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m=' + (mode || 'fast') + ']'); await wait(10);
   const code = host.app.state().roomCode;
   assert.match(code, /^[A-Z0-9]{5}$/);
   assert(host.q('#share').value.endsWith('?room=' + code));
@@ -52,7 +52,16 @@ function act(c, plan) {
   if (tap) return c.click(tap);
   if (c.q('[data-act=next]')) return c.click('[data-act=next]');
   if (c.q('[data-act=end]')) return c.click('[data-act=end]');
+  if (c.q('[data-act=roll]')) return c.click('[data-act=roll]');
+  if (c.q('[data-act=stay]')) {
+    const go = c.qa('[data-act=go]'), rooms = go.filter((x) => +x.getAttribute('data-d') < 0), from = rooms.length ? rooms : go;
+    return c.click(from.length ? from[Math.floor(Math.random() * from.length)] : '[data-act=stay]');
+  }
   if (c.q('[data-act=suggest]')) {
+    if (c.q('.iso')) {                                  // full game: the room is the one I am standing in
+      [0, 1].forEach((k) => { const o = c.qa('[data-act=pick][data-k="' + k + '"]'); c.click(o[Math.floor(Math.random() * o.length)]); });
+      return c.click('[data-act=suggest]');
+    }
     const want = plan && plan(c);
     [0, 1, 2].forEach((k) => {
       const opts = c.qa('[data-act=pick][data-k="' + k + '"]');
@@ -258,6 +267,25 @@ async function play(db, cs, code, plan, until) {
   assert(!mover.q('.modal'), 'my own suggestion needs no pop-up');
   assert(!/Your cards/.test(mover.text()), 'no Your cards section');
   console.log('H ok: pop-up waits for Next turn');
+}
+// I: the full game: dice, walking the mansion, suggesting only in the room you are in
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2'], ['Sir', 'Dada'], null, 'full');
+  let g = db.read('rooms/' + code + '/game');
+  assert(g.mode === 'full' && g.phase === 'roll' && Object.keys(g.pos).length === 4, 'full game starts with a roll');
+  const me = cs.find((c) => c.uid === g.turn);
+  assert(me.q('.iso') && me.qa('.iso .pawn').length === 4 && !me.q('[data-act=suggest]'), 'board with four pawns, no suggesting from the corridor');
+  me.click('[data-act=roll]'); await wait(10);
+  g = db.read('rooms/' + code + '/game');
+  assert(g.phase === 'move' && me.qa('.die').length === 2 && me.qa('[data-act=go]').length > 0, 'dice shown and squares to tap');
+  assert(!cs.find((c) => c.uid !== g.turn).q('[data-act=go]'), 'only the mover can tap squares');
+  const end = await play(db, cs, code);
+  await wait(20);
+  assert(end.over && cs.every((c) => c.q('.stamp')), 'full game plays to the finale');
+  const D = S.makeDeck(S.EDITIONS[0]);
+  end.log.filter((e) => e.t === 's').forEach((e) => assert(e.cards[2] >= D.CS[2], 'suggestions name a room'));
+  console.log('I ok: full game with dice and board,', end.log.length, 'log entries');
 }
 console.log('app tests ok');
 process.exit(0);

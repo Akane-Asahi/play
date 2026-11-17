@@ -9,7 +9,16 @@
 //   log:  [ {t:'s', by, cards, resp:[{p, r:'none'|'showed'}]} | {t:'a', by, cards, ok} ]
 //   out:  { pid: true }              players who made a wrong accusation (they still answer)
 //   over: { winner, envelope, byDefault? }
+//
+//   Full game only (dice and a board, see board.js):
+//   mode: 'full', rc0: index of the first room card
+//   phase: also 'roll' and 'move'
+//   pos:  { pid: square | -(room + 1) }
+//   dice: [a, b]                     this turn's roll
+//   nosug: true                      this turn ended without a suggestion
 // }
+
+import * as B from './board.js';
 
 export const BOT_NAMES = ['Bebun', 'Shishu', 'Protibondhi', 'Sir', 'Dada', 'Bro'];
 export const MIN_PLAYERS = 3, MAX_PLAYERS = 6;
@@ -27,8 +36,57 @@ export function nextActive(game, order, from) {
   return null;
 }
 
-export function newGame(order) {
-  return { turn: order[0], phase: 'suggest' };
+export const isFull = (game) => !!game && game.mode === 'full';
+const turnStart = (game) => (isFull(game) ? 'roll' : 'suggest');
+
+// opts: { mode: 'full', rc0 } for the board game; nothing for the fast game.
+export function newGame(order, opts) {
+  if (!opts || opts.mode !== 'full') return { turn: order[0], phase: 'suggest' };
+  const pos = {};
+  order.forEach((p, i) => { pos[p] = B.STARTS[i % B.STARTS.length]; });
+  return { turn: order[0], phase: 'roll', mode: 'full', rc0: opts.rc0, pos };
+}
+
+// ---- full game: dice and moving ----
+export const roomCardHere = (game, pid) => {
+  const k = isFull(game) && game.pos ? B.roomOf(game.pos[pid]) : -1;
+  return k < 0 ? null : game.rc0 + k;
+};
+export function roll(game, pid, dice) {
+  if (!isFull(game) || game.over || game.phase !== 'roll' || game.turn !== pid) return undefined;
+  if (!Array.isArray(dice) || dice.length !== 2 || !dice.every((d) => Number.isInteger(d) && d >= 1 && d <= 6)) return undefined;
+  return { ...game, phase: 'move', dice: dice.slice() };
+}
+export function passage(game, pid) {
+  if (!isFull(game) || game.over || game.phase !== 'roll' || game.turn !== pid) return undefined;
+  const to = B.PASSAGE[B.roomOf(game.pos[pid])];
+  if (to == null) return undefined;
+  return { ...game, phase: 'suggest', pos: { ...game.pos, [pid]: B.inRoom(to) } };
+}
+// dest: a corridor square, a room as -(k + 1), or 'stay'.
+export function move(game, pid, dest) {
+  if (!isFull(game) || game.over || game.phase !== 'move' || game.turn !== pid || !game.dice) return undefined;
+  if (dest === 'stay') return { ...game, phase: 'end', nosug: true };
+  if (!Number.isInteger(dest)) return undefined;
+  const r = B.reach(game.pos, pid, game.dice[0] + game.dice[1]);
+  if (dest < 0) {
+    if (r.rooms[B.roomOf(dest)] == null) return undefined;
+    return { ...game, phase: 'suggest', pos: { ...game.pos, [pid]: dest } };
+  }
+  if (!r.cells.has(dest)) return undefined;
+  return { ...game, phase: 'end', nosug: true, pos: { ...game.pos, [pid]: dest } };
+}
+// Where a bot goes: the room it wants if it can get there, else any room, else closer to the one it wants.
+export function botMove(game, pid, goal, rng) {
+  const r = B.reach(game.pos, pid, game.dice[0] + game.dice[1]), here = B.roomOf(game.pos[pid]);
+  const rooms = Object.keys(r.rooms).map(Number);
+  if (rooms.includes(goal)) return B.inRoom(goal);
+  if (rooms.length) return B.inRoom(rooms[Math.floor(rng() * rooms.length)]);
+  if (goal == null || goal < 0 || goal === here) goal = ((here < 0 ? 0 : here) + 1 + Math.floor(rng() * (B.ROOMS - 1))) % B.ROOMS;
+  const d = B.distTo(goal);
+  let best = 'stay', bd = Infinity;
+  r.cells.forEach((_, c) => { const v = d.get(c); if (v != null && v < bd) { bd = v; best = c; } });
+  return best;
 }
 
 const validCards = (cards) => Array.isArray(cards) && cards.length === 3 && cards.every((c) => Number.isInteger(c));
@@ -37,6 +95,7 @@ export function suggest(game, by, cards, order) {
   if (!game || game.over || game.phase !== 'suggest' || game.turn !== by || !validCards(cards)) return undefined;
   const i = order.indexOf(by);
   if (i < 0) return undefined;
+  if (isFull(game) && cards[2] !== roomCardHere(game, by)) return undefined;     // only the room you are in
   const ask = [];
   for (let k = 1; k < order.length; k++) ask.push(order[(i + k) % order.length]);
   return { ...game, phase: 'answer', cur: { by, cards: cards.slice(), order: ask, i: 0, n: logOf(game).length } };
@@ -59,12 +118,14 @@ export function answer(game, pid, r) {
 
 export function endTurn(game, pid, order) {
   if (!game || game.over || game.phase !== 'end' || game.turn !== pid) return undefined;
-  return { ...game, phase: 'suggest', turn: nextActive(game, order, pid) };
+  const next = { ...game, phase: turnStart(game), turn: nextActive(game, order, pid) };
+  delete next.dice; delete next.nosug;
+  return next;
 }
 
 export function accuse(game, pid, cards) {
   if (!game || game.over || game.turn !== pid || !validCards(cards)) return undefined;
-  if (game.phase !== 'suggest' && game.phase !== 'end') return undefined;
+  if (game.phase !== 'suggest' && game.phase !== 'end' && !(isFull(game) && game.phase === 'roll')) return undefined;
   return { ...game, phase: 'accusing', acc: { by: pid, cards: cards.slice() } };
 }
 
@@ -85,7 +146,8 @@ export function resolveAccuse(game, envelope, order) {
     next.over = { winner: left[0] || null, envelope: envelope.slice(), byDefault: true };
     return next;
   }
-  next.phase = 'suggest';
+  next.phase = turnStart(game);
+  delete next.dice; delete next.nosug;
   next.turn = nextActive(next, order, by);
   return next;
 }

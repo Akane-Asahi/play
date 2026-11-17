@@ -58,3 +58,12 @@ npm test
 - `clue/solver.js`: the deduction engine, copied from the Clues repo
 - `clue/portraits.js`, `clue/img/`: card art
 - `database.rules.json`: the Realtime Database rules (repo root)
+
+## Fast game and full game
+
+When you create a room you pick the kind of game (the host can still switch it in the lobby):
+
+- **Fast game** – cards only: take turns making suggestions.
+- **Full game** – an isometric mansion (`clue/board.js`, drawn by `clue/boardview.js`). Roll two dice, walk the
+  corridors, and make a suggestion only in the room you walk into. Corner rooms have secret passages.
+  Pawns in corridors block the way. Bots roll and walk too.

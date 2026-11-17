@@ -1,6 +1,8 @@
 // Multiplayer Clues: lobby, turns, bots and notes. All network access goes through `net`
 // (see main.js for the Firebase version), so the same code runs in tests against a fake.
 import * as E from './engine.js';
+import * as B from './board.js';
+import { boardSvg, dieSvg, SEAT_COLORS } from './boardview.js';
 
 export function startApp({ net, doc, win, delays }) {
   const S = win.ClueSolver;
@@ -20,8 +22,8 @@ export function startApp({ net, doc, win, delays }) {
   let meta = null, players = {}, game = null, myHand = null, myShown = null;
   let unsubs = [];
   let msg = '';
-  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
-  let autoKey = null, hostBusy = false, hostDirty = false, helperKey = null, helperRes = null;
+  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, choosing: false, selKey: null, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
+  let autoKey = null, hostBusy = false, hostDirty = false, helperKey = null, helperRes = null, botPlan = null;
 
   // ---------- helpers ----------
   const room = (p) => 'rooms/' + roomCode + (p ? '/' + p : '');
@@ -96,13 +98,13 @@ export function startApp({ net, doc, win, delays }) {
     return name;
   }
 
-  async function createRoom() {
+  async function createRoom(mode) {
     const name = needName();
     uid = await net.signIn();
     let code = randomCode();
     for (let i = 0; i < 5 && (await net.get('rooms/' + code + '/meta')); i++) code = randomCode();
     await net.update('rooms/' + code, {
-      'meta/host': uid, 'meta/edition': ui.edition, 'meta/status': 'lobby', 'meta/helper': true, 'meta/createdAt': Date.now(),
+      'meta/host': uid, 'meta/edition': ui.edition, 'meta/status': 'lobby', 'meta/helper': true, 'meta/mode': mode === 'full' ? 'full' : 'fast', 'meta/createdAt': Date.now(),
       ['players/' + uid]: { name, seat: 0, bot: false },
     });
     enterRoom(code);
@@ -160,7 +162,7 @@ export function startApp({ net, doc, win, delays }) {
     const seed = win.crypto.getRandomValues(new Uint32Array(1))[0];
     const sizes = S.defaultHands(ord.length, D.N - 3);
     const { envelope, hands } = E.deal(D, ord, sizes, S.mulberry32(seed));
-    const up = { 'meta/status': 'playing', 'meta/startedAt': Date.now(), 'secret/envelope': envelope, game: E.newGame(ord), shown: null };
+    const up = { 'meta/status': 'playing', 'meta/startedAt': Date.now(), 'secret/envelope': envelope, game: E.newGame(ord, meta.mode === 'full' ? { mode: 'full', rc0: D.CS[2] } : null), shown: null };
     ord.forEach((pid, i) => { up['hands/' + pid] = hands[pid]; up['players/' + pid + '/handSize'] = sizes[i]; });
     await net.update(room(), up);
   }
@@ -176,7 +178,7 @@ export function startApp({ net, doc, win, delays }) {
   function resetPick() { ui.sel = [null, null, null]; ui.accusing = false; ui.confirm = false; }
 
   async function doSuggest() {
-    if (!ui.sel.every((c) => c != null)) return;
+    if (!sugReady()) return;
     const cards = ui.sel.slice(), ord = order();
     resetPick();
     await tx((g) => E.suggest(g, uid, cards, ord));
@@ -187,6 +189,13 @@ export function startApp({ net, doc, win, delays }) {
     resetPick();
     await tx((g) => E.accuse(g, uid, cards));
   }
+  const full = () => E.isFull(game);
+  const hereCard = () => E.roomCardHere(game, uid);
+  const sugReady = () => ui.sel.every((c) => c != null) && (!full() || ui.sel[2] === hereCard());
+  const die = () => 1 + Math.floor(Math.random() * 6);
+  const doRoll = () => tx((g) => E.roll(g, uid, [die(), die()]));
+  const doPassage = () => tx((g) => E.passage(g, uid));
+  const doMove = (d) => tx((g) => E.move(g, uid, d));
   async function doEndTurn() {
     const ord = order();
     resetPick();
@@ -237,15 +246,27 @@ export function startApp({ net, doc, win, delays }) {
       });
       return tx((x) => (same(x) ? E.answer(x, p, 'showed') : undefined));
     }
-    if ((g.phase === 'suggest' || g.phase === 'end') && isBot(g.turn)) {
+    if (['suggest', 'end', 'roll', 'move'].includes(g.phase) && isBot(g.turn)) {
       const p = g.turn;
       await sleep(D0.bot);
-      const hand = (await net.get(room('hands/' + p))) || [];
-      const shown = await net.get(room('shown/' + p));
-      const mv = E.botThink(S, E.solverState(edition(), players, ord, p, hand, g, shown), Math.random);
+      const key = p + ':' + E.logOf(g).length + ':' + (meta.startedAt || 0);
+      if (!botPlan || botPlan.key !== key) {              // one think per turn, not one per step
+        const hand = (await net.get(room('hands/' + p))) || [];
+        const shown = await net.get(room('shown/' + p));
+        botPlan = { key, mv: E.botThink(S, E.solverState(edition(), players, ord, p, hand, g, shown), Math.random) };
+      }
+      const mv = botPlan.mv;
+      if (g.phase === 'move') return tx((x) => (x && x.phase === 'move' && x.turn === p ? E.move(x, p, E.botMove(x, p, mv.suggest ? mv.suggest[2] - x.rc0 : -1, Math.random)) : undefined));
       if (mv.accuse) return tx((x) => E.accuse(x, p, mv.accuse));
       if (g.phase === 'end') return tx((x) => E.endTurn(x, p, ord));
-      return tx((x) => E.suggest(x, p, mv.suggest, ord));
+      if (g.phase === 'roll') {
+        const here = B.roomOf(g.pos[p]);
+        if (B.PASSAGE[here] != null && B.PASSAGE[here] === mv.suggest[2] - g.rc0) return tx((x) => E.passage(x, p));
+        return tx((x) => E.roll(x, p, [die(), die()]));
+      }
+      const cards = mv.suggest.slice();
+      if (E.isFull(g)) cards[2] = E.roomCardHere(g, p);
+      return tx((x) => E.suggest(x, p, cards, ord));
     }
     return false;
   }
@@ -276,7 +297,11 @@ export function startApp({ net, doc, win, delays }) {
     return '<section class="card"><h2>Your name</h2><input type="text" id="name" maxlength="20" placeholder="e.g. Telot" autocomplete="nickname" value="' + esc(ui.name) + '"></section>' +
       '<section class="card"><h2>Start a room</h2><select id="edition">' +
       S.EDITIONS.map((e) => '<option value="' + esc(e.id) + '"' + (e.id === ui.edition ? ' selected' : '') + '>' + esc(e.name) + '</option>').join('') +
-      '</select><button class="btn" data-act="create">Create room</button></section>' +
+      '</select>' + (ui.choosing
+        ? '<p class="muted" style="margin-top:12px">What kind of game?</p><div class="modes">' +
+          '<button class="mode" data-act="mk" data-m="fast"><b>Fast game</b><span>Cards only. Take turns making suggestions, no board.</span></button>' +
+          '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Roll the dice, walk the mansion and suggest in the room you enter.</span></button></div>'
+        : '<button class="btn" data-act="create">Create room</button>') + '</section>' +
       '<section class="card"><h2>Join a room</h2><p class="muted">Type the code a friend sent you, or open their link.</p>' +
       '<input type="text" id="code" maxlength="5" placeholder="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
       '<button class="btn ghost" data-act="join">Join room</button></section>';
@@ -302,10 +327,12 @@ export function startApp({ net, doc, win, delays }) {
         '</div><p class="muted">Bots play on your device, so keep this page open during the game.</p></section>';
       h += '<section class="card"><div class="switch"><div><b>Notes sheet for everyone</b><div class="muted">Each player gets a sheet to tick and cross by hand as they work out the case.</div></div>' +
         '<button class="tog' + (meta.helper ? ' on' : '') + '" data-act="helper" aria-label="Toggle notes"></button></div></section>';
+      h += '<section class="card"><h2>Game</h2><div class="modes">' + [['fast', 'Fast game', 'Cards only, no board.'], ['full', 'Full game', 'Dice, the mansion and rooms.']].map((m) =>
+        '<button class="mode' + ((meta.mode || 'fast') === m[0] ? ' on' : '') + '" data-act="setmode" data-m="' + m[0] + '"><b>' + m[1] + '</b><span>' + m[2] + '</span></button>').join('') + '</div></section>';
       h += '<button class="btn" data-act="start"' + (ord.length < E.MIN_PLAYERS ? ' disabled' : '') + '>Start game</button>' +
         (ord.length < E.MIN_PLAYERS ? '<p class="muted center">You need at least ' + E.MIN_PLAYERS + ' players. Add a bot or invite a friend.</p>' : '');
     } else {
-      h += '<p class="muted center">Waiting for ' + esc(nmFull(meta.host)) + ' to start the game.</p>';
+      h += '<p class="muted center">' + (meta.mode === 'full' ? 'Full game with dice and the mansion. ' : 'Fast game. ') + 'Waiting for ' + esc(nmFull(meta.host)) + ' to start the game.</p>';
     }
     return h;
   }
@@ -314,7 +341,7 @@ export function startApp({ net, doc, win, delays }) {
   function picking() {
     const g = game;
     if (!g || g.over || g.turn !== uid) return false;
-    if (g.phase === 'answer' || g.phase === 'accusing') return false;
+    if (g.phase === 'answer' || g.phase === 'accusing' || g.phase === 'roll' || g.phase === 'move') return false;
     return g.phase !== 'end' || ui.accusing;
   }
   // The first cell of a notes row: the card's name, tappable while I'm choosing.
@@ -330,7 +357,13 @@ export function startApp({ net, doc, win, delays }) {
     if (!g || g.over || g.turn !== uid || g.phase === 'answer' || g.phase === 'accusing') return '';
     const ready = ui.sel.every((c) => c != null);
     let inner;
-    if (g.phase === 'end' && !ui.accusing) {
+    if (g.phase === 'roll') {
+      const to = B.PASSAGE[B.roomOf(g.pos[uid])];
+      inner = '<div class="row"><button class="btn grow" data-act="roll">Roll the dice</button>' +
+        (to != null ? '<button class="btn ghost grow" data-act="passage">Secret passage to the ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>';
+    } else if (g.phase === 'move') {
+      inner = '<div class="fsum">Tap a glowing square or room on the board</div><div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>';
+    } else if (g.phase === 'end' && !ui.accusing) {
       inner = '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Make an accusation</button></div>';
     } else if (ui.confirm && ready) {
       inner = '<div class="fsum warnt"><b>Accuse ' + esc(D.CARDS[ui.sel[0]]) + ' with the ' + esc(D.CARDS[ui.sel[1]]) + ' in the ' + esc(D.CARDS[ui.sel[2]]) + '?</b> If you are wrong, you are out.</div>' +
@@ -339,7 +372,8 @@ export function startApp({ net, doc, win, delays }) {
       const sum = ready ? ui.sel.map((c) => esc(D.CARDS[c])).join(' · ') : (ui.sel.some((c) => c != null) ? ui.sel.map((c, k) => c != null ? esc(D.CARDS[c]) : '<i>' + S.CAT_NAMES[k].toLowerCase() + '?</i>').join(' · ') : 'Tap a suspect, a weapon and a room in your notes');
       inner = '<div class="fsum">' + sum + '</div>' + (g.phase === 'end'
         ? '<div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">Back</button></div>'
-        : '<div class="row"><button class="btn grow" data-act="suggest"' + (ready ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>');
+        : (full() && ready && !sugReady() ? '<div class="fsum"><i>You can only suggest the ' + esc(D.CARDS[hereCard()]) + ', where you are. An accusation can name any room.</i></div>' : '') +
+          '<div class="row"><button class="btn grow" data-act="suggest"' + (sugReady() ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>');
     }
     return '<div class="float" role="region" aria-label="Your move">' + inner + '</div>';
   }
@@ -463,12 +497,19 @@ export function startApp({ net, doc, win, delays }) {
     if (g.phase === 'answer' && g.cur) return '<div class="ask"><div class="muted">Turn</div><div class="who">' + esc(nmFull(g.turn)) + '</div><div class="muted">is waiting for answers</div></div>';
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
-      if (g.phase === 'end' && !ui.accusing) return lastResultHtml(D, true) + '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
+      const dice = g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '';
+      if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
+      if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div>' + dice + '<div class="muted">You rolled ' + (g.dice[0] + g.dice[1]) + '. Tap where you want to go.</div></div>';
+      if (full() && g.phase === 'suggest') return '<div class="ask"><div class="muted">You are in the</div><div class="who">' + esc(D.CARDS[hereCard()]) + '</div><div class="muted">Choose a suspect and a weapon in your notes</div></div>';
+      if (g.phase === 'end' && !ui.accusing) return (g.nosug ? '' : lastResultHtml(D, true)) + '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
       return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>';
     }
-    let h = g.phase === 'end' ? lastResultHtml(D, false) : '';
-    h += '<div class="ask"><div class="muted">' + (g.phase === 'end' ? 'Waiting for' : 'Turn') + '</div><div class="who">' + esc(nmFull(g.turn)) + '</div><div class="muted">' +
-      (g.phase === 'end' ? 'to end their turn' : 'is choosing a suggestion') + '</div></div>';
+    let h = g.phase === 'end' && !g.nosug ? lastResultHtml(D, false) : '';
+    const hereK = full() ? B.roomOf(g.pos[g.turn]) : -1;
+    h += '<div class="ask"><div class="muted">' + (g.phase === 'end' ? 'Waiting for' : 'Turn') + '</div><div class="who">' + esc(nmFull(g.turn)) + '</div>' +
+      (g.phase === 'move' && g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '') + '<div class="muted">' +
+      (g.phase === 'end' ? 'to end their turn' : g.phase === 'roll' ? 'is about to roll the dice' : g.phase === 'move' ? 'rolled ' + (g.dice[0] + g.dice[1]) + ' and is moving'
+        : hereK >= 0 ? 'is in the ' + esc(D.CARDS[g.rc0 + hereK]) + ', choosing a suggestion' : 'is choosing a suggestion') + '</div></div>';
     if (E.isOut(g, me)) h += '<p class="muted center">Your accusation was wrong, so you are out. You still show cards when asked.</p>';
     return h;
   }
@@ -578,13 +619,27 @@ export function startApp({ net, doc, win, delays }) {
     return inner ? '<div class="modal"><div class="mcard" role="dialog" aria-modal="true">' + inner + '</div></div>' : '';
   }
 
+  // The mansion, for the full game.
+  function boardHtml(D) {
+    const g = game, ord = order();
+    if (!E.isFull(g) || !g.pos) return '';
+    const go = g.phase === 'move' && g.turn === uid && g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null;
+    const roomNames = Array.from({ length: B.ROOMS }, (_, k) => D.CARDS[g.rc0 + k]);
+    return '<section class="card boardc">' + boardSvg({ pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go }) +
+      '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + '</span>').join('') + '</div></section>';
+  }
+
   function gameHtml() {
     if (!game) return '<p class="muted center">Dealing…</p>';
     const D = deck(), ord = order();
     if (game.over) return '<section class="card finale">' + finaleHtml(D) + '</section>' + turnsHtml(D);
     const key = String(meta.startedAt || 0), log = E.logOf(game);
     if (ui.seenKey !== key) { ui.seenKey = key; ui.seen = log.length; }       // only what happens from now on
-    const h = '<section class="card act">' + actionHtml(D) + '</section>';
+    if (full() && game.turn === uid && game.phase === 'suggest') {          // the room I walked into is already chosen
+      const k = log.length + ':' + game.pos[uid];
+      if (ui.selKey !== k) { ui.selKey = k; ui.sel[2] = hereCard(); }
+    }
+    const h = '<section class="card act">' + actionHtml(D) + '</section>' + boardHtml(D);
     return h + notesHtml(D) + turnsHtml(D) + floatHtml(D) + modalHtml(D);
   }
 
@@ -622,9 +677,15 @@ export function startApp({ net, doc, win, delays }) {
   doc.addEventListener('click', (e) => {
     const el = e.target.closest ? e.target.closest('[data-act]') : null;
     if (!el || el.disabled || el.classList.contains('off')) return;
-    const a = el.dataset.act;
+    const a = el.getAttribute('data-act');
     switch (a) {
-      case 'create': run(createRoom); break;
+      case 'create': try { msg = ''; needName(); ui.choosing = true; } catch (err) { msg = err.message; } render(); break;
+      case 'mk': run(() => createRoom(el.dataset.m)); break;
+      case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), el.dataset.m === 'full' ? 'full' : 'fast') : null)); break;
+      case 'roll': run(doRoll); break;
+      case 'passage': run(doPassage); break;
+      case 'stay': run(() => doMove('stay')); break;
+      case 'go': run(() => doMove(+el.getAttribute('data-d'))); break;
       case 'join': run(() => { const c = (ui.code || '').trim().toUpperCase(); if (!c) throw new Error('Type the room code first.'); return joinRoom(c); }); break;
       case 'copy': run(async () => {
         try { await win.navigator.clipboard.writeText(shareUrl()); msg = 'Link copied.'; }
