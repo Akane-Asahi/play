@@ -123,3 +123,9 @@ main{padding-bottom:150px}
 .nt tr.sel td{background:rgba(193,155,87,.22)}
 .nt tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent);opacity:1}
 .nt.pickonly td{text-align:left}
+
+/* pop-up for suggestions, answers and accusations */
+.modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(8,6,4,.78);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.mcard{width:100%;max-width:460px;max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px);overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 14px 16px;box-shadow:0 24px 60px rgba(0,0,0,.7)}
+.mcard>.btn{margin-top:14px}
+.mcard .pills{justify-content:center}

@@ -50,6 +50,7 @@ async function lobby(db, humans, bots, names) {
 function act(c, plan) {
   const tap = c.q('.fc.tap');
   if (tap) return c.click(tap);
+  if (c.q('[data-act=next]')) return c.click('[data-act=next]');
   if (c.q('[data-act=end]')) return c.click('[data-act=end]');
   if (c.q('[data-act=suggest]')) {
     const want = plan && plan(c);
@@ -81,7 +82,7 @@ async function play(db, cs, code, plan, until) {
   const hands = db.read('rooms/' + code + '/hands'), env = db.read('rooms/' + code + '/secret/envelope');
   assert.equal(Object.keys(hands).length, 4);
   cs.forEach((c) => assert.deepEqual(c.app.state().myHand, hands[c.uid], 'each player sees exactly their own hand'));
-  assert(cs[1].text().includes('Your cards') && cs[1].q('table.nt.manual') && cs[1].q('.rd'), 'game screen with a hand-filled notes sheet');
+  assert(cs[1].text().includes('Your notes') && cs[1].q('table.nt.manual') && cs[1].q('.rd'), 'game screen with a hand-filled notes sheet');
   assert(!cs[1].q('.nt .pc'), 'no calculated percentages for other names');
   const g = await play(db, cs, code);
   await wait(20);
@@ -237,6 +238,26 @@ async function play(db, cs, code, plan, until) {
   assert.equal(me.qa('.ppanel .pr')[cs.findIndex((c) => c.uid === me.uid)].querySelectorAll('.chip').length, me.app.state().myHand.length, 'my own cards in full');
   me.click('.phead .x'); assert(!me.q('.ppanel'), 'list closes');
   console.log('G ok: notes picking, floating buttons, players list');
+}
+// H: the pop-up for someone else's suggestion waits for Next turn
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], []);
+  const g0 = db.read('rooms/' + code + '/game');
+  const mover = cs.find((c) => c.uid === g0.turn), watcher = cs.find((c) => c.uid !== g0.turn && c.uid !== cs.find((x) => x.uid !== g0.turn).uid) || cs.find((c) => c.uid !== g0.turn);
+  assert(!watcher.q('.modal'), 'no pop-up before anything happens');
+  [0, 1, 2].forEach((k) => mover.click(mover.qa('tr.pk td[data-act=pick][data-k="' + k + '"]')[0]));
+  mover.click('[data-act=suggest]'); await wait(10);
+  assert(watcher.q('.modal .fan'), 'asked players and watchers get a pop-up with the cards');
+  // let everybody answer, never tapping Next turn
+  for (let i = 0; i < 300 && db.read('rooms/' + code + '/game').phase === 'answer'; i++) { cs.forEach((c) => { const t = c.q('.fc.tap'); if (t) c.click(t); }); await wait(2); }
+  await wait(10);
+  assert.equal(db.read('rooms/' + code + '/game').phase, 'end');
+  const w2 = cs.filter((c) => c.uid !== mover.uid && !c.q('.fc.tap'));
+  w2.forEach((c) => { if (c.q('[data-act=next]')) { assert(c.q('.modal'), 'result pop-up stays'); c.click('[data-act=next]'); } assert(!c.q('.modal'), c.uid + ' pop-up closes after Next turn'); });
+  assert(!mover.q('.modal'), 'my own suggestion needs no pop-up');
+  assert(!/Your cards/.test(mover.text()), 'no Your cards section');
+  console.log('H ok: pop-up waits for Next turn');
 }
 console.log('app tests ok');
 process.exit(0);

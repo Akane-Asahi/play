@@ -20,7 +20,7 @@ export function startApp({ net, doc, win, delays }) {
   let meta = null, players = {}, game = null, myHand = null, myShown = null;
   let unsubs = [];
   let msg = '';
-  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
+  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
   let autoKey = null, hostBusy = false, hostDirty = false, helperKey = null, helperRes = null;
 
   // ---------- helpers ----------
@@ -433,7 +433,8 @@ export function startApp({ net, doc, win, delays }) {
     return h + '</div>';
   }
 
-  function actionHtml(D) {
+  // What the pop-up shows while a suggestion or accusation is being answered.
+  function liveHtml(D) {
     const g = game, me = uid;
     if (g.phase === 'answer' && g.cur) {
       const cur = g.cur, who = E.asked(g), iAsk = cur.by === me, meAsked = who === me;
@@ -454,6 +455,13 @@ export function startApp({ net, doc, win, delays }) {
       return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">' + (g.acc.by === me ? 'You accuse' : 'accuses') + '</div></div>' +
         fan(D, g.acc.cards) + '<p class="muted center">Checking the envelope…</p>';
     }
+    return '';
+  }
+
+  function actionHtml(D) {
+    const g = game, me = uid;
+    if (g.phase === 'answer' && g.cur) return '<div class="ask"><div class="muted">Turn</div><div class="who">' + esc(nmFull(g.turn)) + '</div><div class="muted">is waiting for answers</div></div>';
+    if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
       if (g.phase === 'end' && !ui.accusing) return lastResultHtml(D, true) + '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
       return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>';
@@ -542,14 +550,42 @@ export function startApp({ net, doc, win, delays }) {
     return t + '</tbody></table><p class="muted">👁️ marks a card you saw or showed.</p></section>';
   }
 
+  // Entries I don't need to be told about: my own moves and cards I showed.
+  function skippable(e) {
+    return e.by === uid || (e.resp || []).some((r) => r.p === uid && r.r === 'showed');
+  }
+  function pendingEntry() {
+    const log = E.logOf(game);
+    while (ui.seen < log.length && skippable(log[ui.seen])) ui.seen++;
+    return ui.seen < log.length ? ui.seen : -1;
+  }
+  // What someone else just did, waiting until I tap Next turn.
+  function resultHtml(D, i) {
+    const e = E.logOf(game)[i], names = e.cards.map((c) => D.CARDS[c]).join(', ');
+    let h = '<div class="ask"><div class="muted">' + (e.t === 'a' ? 'Accusation' : 'Suggestion') + '</div><div class="who">' + esc(nmFull(e.by)) + '</div><div class="muted">' + (e.t === 'a' ? 'accused' : 'asked about') + '</div></div>' + fan(D, e.cards);
+    if (e.t === 'a') {
+      h += '<div class="banner"><b>' + esc(nm(e.by)) + ' was wrong and is out of the game.</b><br>' + esc(names) + '</div>';
+    } else {
+      const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed');
+      h += '<div class="pills">' + resp.map((r) => '<span class="pill done">' + esc(nm(r.p)) + ' · ' + (r.r === 'none' ? 'has none' : 'showed') + '</span>').join('') + '</div>';
+      h += '<div class="banner"><b>' + (shower ? esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.' : 'Nobody had any of these.') + '</b></div>';
+    }
+    return h + '<button class="btn" data-act="next">Next turn</button>';
+  }
+  function modalHtml(D) {
+    let inner = liveHtml(D);
+    if (!inner) { const i = pendingEntry(); if (i >= 0) inner = resultHtml(D, i); }
+    return inner ? '<div class="modal"><div class="mcard" role="dialog" aria-modal="true">' + inner + '</div></div>' : '';
+  }
+
   function gameHtml() {
     if (!game) return '<p class="muted center">Dealing…</p>';
     const D = deck(), ord = order();
     if (game.over) return '<section class="card finale">' + finaleHtml(D) + '</section>' + turnsHtml(D);
-    let h = '<section class="card act">' + actionHtml(D) + '</section>';
-    h += '<section class="card"><h2>Your cards</h2><div class="chips">' +
-      (myHand && myHand.length ? myHand.map((c) => chip(D, c, ' still')).join('') : '<span class="muted">Dealing…</span>') + '</div></section>';
-    return h + notesHtml(D) + turnsHtml(D) + floatHtml(D);
+    const key = String(meta.startedAt || 0), log = E.logOf(game);
+    if (ui.seenKey !== key) { ui.seenKey = key; ui.seen = log.length; }       // only what happens from now on
+    const h = '<section class="card act">' + actionHtml(D) + '</section>';
+    return h + notesHtml(D) + turnsHtml(D) + floatHtml(D) + modalHtml(D);
   }
 
   function render() {
@@ -601,6 +637,7 @@ export function startApp({ net, doc, win, delays }) {
       case 'again': run(backToLobby); break;
       case 'home': win.location.href = win.location.pathname; break;
       case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
+      case 'next': ui.seen++; render(); break;
       case 'players': ui.plOpen = !ui.plOpen; render(); break;
       case 'pexp': ui.plExp[el.dataset.p] = !ui.plExp[el.dataset.p]; render(); break;
       case 'suggest': run(doSuggest); break;
