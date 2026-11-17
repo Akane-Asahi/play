@@ -23,7 +23,7 @@ export function startApp({ net, doc, win, delays }) {
   let unsubs = [];
   let msg = '';
   const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, choosing: false, selKey: null, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
-  let autoKey = null, hostBusy = false, hostDirty = false, helperKey = null, helperRes = null, botPlan = null;
+  let hostBusy = false, hostDirty = false, helperKey = null, helperRes = null, botPlan = null;
 
   // ---------- helpers ----------
   const room = (p) => 'rooms/' + roomCode + (p ? '/' + p : '');
@@ -212,15 +212,12 @@ export function startApp({ net, doc, win, delays }) {
     });
     await tx((g) => E.answer(g, uid, 'showed'));
   }
-  // When I'm asked and hold none of the cards, say so without a tap.
-  function autoNone() {
-    if (!game || game.over || E.asked(game) !== uid || !myHand) { return; }
+  // When I'm asked and hold none of the cards, I tap Pass.
+  async function doPass() {
+    if (!game || game.over || E.asked(game) !== uid || !myHand) return;
     const cur = game.cur;
-    if (cur.cards.some((c) => myHand.includes(c))) return;
-    const key = cur.n + ':' + cur.i;
-    if (autoKey === key) return;
-    autoKey = key;
-    win.setTimeout(() => { run(() => tx((g) => (g && g.cur && g.cur.n === cur.n && g.cur.i === cur.i ? E.answer(g, uid, 'none') : undefined))); }, D0.none);
+    if (cur.cards.some((c) => myHand.includes(c))) return;       // you must show a card if you have one
+    await tx((g) => (g && g.cur && g.cur.n === cur.n && g.cur.i === cur.i ? E.answer(g, uid, 'none') : undefined));
   }
 
   // ---------- host duties: bots and checking accusations ----------
@@ -414,7 +411,7 @@ export function startApp({ net, doc, win, delays }) {
     const resp = cur.resp || [];
     return '<div class="pills">' + cur.order.map((p, i) => {
       const r = resp[i];
-      return '<span class="pill' + (i === cur.i ? ' on' : '') + (r ? ' done' : '') + '">' + esc(nm(p)) + (r ? ' · ' + (r.r === 'none' ? 'has none' : 'showed') : '') + '</span>';
+      return '<span class="pill' + (i === cur.i ? ' on' : '') + (r ? ' done' : '') + '">' + esc(nm(p)) + (r ? ' · ' + (r.r === 'none' ? 'passed' : 'showed a card') : '') + '</span>';
     }).join('') + '</div>';
   }
 
@@ -482,7 +479,8 @@ export function startApp({ net, doc, win, delays }) {
         const before = E.shownTo(myShown, cur.by);
         h += (held.length ? 'Pick the card you show' : 'You have none of these') + '</div></div>';
         h += fan(D, cur.cards, { tap: (c) => held.includes(c), dead: (c) => !held.includes(c), seen: (c) => held.includes(c) && before.includes(c), hint: 'Tap to show' });
-        h += '<p class="muted center">' + (held.length ? 'Only ' + esc(nm(cur.by)) + ' sees the card you tap. 👁️ marks a card you already showed them.' : 'Passing to the next player…') + '</p>';
+        h += held.length ? '<p class="muted center">Only ' + esc(nm(cur.by)) + ' sees the card you tap. 👁️ marks a card you already showed them.</p>'
+          : (myHand ? '<button class="btn" data-act="pass">Pass</button>' : '');
       } else {
         h += 'if they have any of these</div></div>' + fan(D, cur.cards);
         h += '<p class="muted center">' + (iAsk ? 'If ' + esc(nm(who)) + ' has one, you will see it.' : 'You won\'t see which card is shown.') + '</p>';
@@ -613,7 +611,7 @@ export function startApp({ net, doc, win, delays }) {
       h += '<div class="banner"><b>' + esc(nm(e.by)) + ' was wrong and is out of the game.</b><br>' + esc(names) + '</div>';
     } else {
       const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed');
-      h += '<div class="pills">' + resp.map((r) => '<span class="pill done">' + esc(nm(r.p)) + ' · ' + (r.r === 'none' ? 'has none' : 'showed') + '</span>').join('') + '</div>';
+      h += '<div class="pills">' + resp.map((r) => '<span class="pill done">' + esc(nm(r.p)) + ' · ' + (r.r === 'none' ? 'passed' : 'showed a card') + '</span>').join('') + '</div>';
       h += '<div class="banner"><b>' + (shower ? esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.' : 'Nobody had any of these.') + '</b></div>';
     }
     return h + '<button class="btn" data-act="next">Next turn</button>';
@@ -662,7 +660,7 @@ export function startApp({ net, doc, win, delays }) {
     if (pb) pb.hidden = !inGame;
     $('view').innerHTML = h + (inGame ? playersPanel() : '');
     $('msg').textContent = msg;
-    if (roomCode && meta && meta.status === 'playing') { autoNone(); hostTick(); }
+    if (roomCode && meta && meta.status === 'playing') { hostTick(); }
   }
 
   // ---------- events ----------
@@ -688,6 +686,7 @@ export function startApp({ net, doc, win, delays }) {
       case 'mk': run(() => createRoom(el.dataset.m)); break;
       case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), el.dataset.m === 'full' ? 'full' : 'fast') : null)); break;
       case 'roll': run(doRoll); break;
+      case 'pass': run(doPass); break;
       case 'passage': run(doPassage); break;
       case 'stayin': run(doStayIn); break;
       case 'stay': run(() => doMove('stay')); break;

@@ -50,6 +50,7 @@ async function lobby(db, humans, bots, names, mode) {
 function act(c, plan) {
   const tap = c.q('.fc.tap');
   if (tap) return c.click(tap);
+  if (c.q('[data-act=pass]')) return c.click('[data-act=pass]');
   if (c.q('[data-act=next]')) return c.click('[data-act=next]');
   if (c.q('[data-act=end]')) return c.click('[data-act=end]');
   if (c.q('[data-act=roll]')) return c.click('[data-act=roll]');
@@ -259,7 +260,7 @@ async function play(db, cs, code, plan, until) {
   mover.click('[data-act=suggest]'); await wait(10);
   assert(watcher.q('.modal .fan'), 'asked players and watchers get a pop-up with the cards');
   // let everybody answer, never tapping Next turn
-  for (let i = 0; i < 300 && db.read('rooms/' + code + '/game').phase === 'answer'; i++) { cs.forEach((c) => { const t = c.q('.fc.tap'); if (t) c.click(t); }); await wait(2); }
+  for (let i = 0; i < 300 && db.read('rooms/' + code + '/game').phase === 'answer'; i++) { cs.forEach((c) => { const t = c.q('.fc.tap'); if (t) c.click(t); else if (c.q('[data-act=pass]')) c.click('[data-act=pass]'); }); await wait(2); }
   await wait(10);
   assert.equal(db.read('rooms/' + code + '/game').phase, 'end');
   const w2 = cs.filter((c) => c.uid !== mover.uid && !c.q('.fc.tap'));
