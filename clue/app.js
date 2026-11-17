@@ -504,7 +504,7 @@ export function startApp({ net, doc, win, delays }) {
       if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
       if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div>' + dice + '<div class="muted">You rolled ' + (g.dice[0] + g.dice[1]) + '. Tap where you want to go.</div></div>';
       if (full() && g.phase === 'suggest') return '<div class="ask"><div class="muted">You are in the</div><div class="who">' + esc(D.CARDS[hereCard()]) + '</div><div class="muted">Choose a suspect and a weapon in your notes</div></div>';
-      if (g.phase === 'end' && !ui.accusing) return (g.nosug ? '' : lastResultHtml(D, true)) + '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
+      if (g.phase === 'end' && !ui.accusing) return '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
       return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>';
     }
     let h = g.phase === 'end' && !g.nosug ? lastResultHtml(D, false) : '';
@@ -596,7 +596,7 @@ export function startApp({ net, doc, win, delays }) {
 
   // Entries I don't need to be told about: my own moves and cards I showed.
   function skippable(e) {
-    return e.by === uid || (e.resp || []).some((r) => r.p === uid && r.r === 'showed');
+    return (e.t === 'a' && e.by === uid) || (e.resp || []).some((r) => r.p === uid && r.r === 'showed');
   }
   function pendingEntry() {
     const log = E.logOf(game);
@@ -606,6 +606,13 @@ export function startApp({ net, doc, win, delays }) {
   // What someone else just did, waiting until I tap Next turn.
   function resultHtml(D, i) {
     const e = E.logOf(game)[i], names = e.cards.map((c) => D.CARDS[c]).join(', ');
+    if (e.t === 's' && e.by === uid) {                       // my own suggestion: the card I was shown
+      const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed'), sh = myShown && myShown[i], has = sh && sh.card != null;
+      return '<div class="pills">' + resp.map((r) => '<span class="pill done">' + esc(nm(r.p)) + ' · ' + (r.r === 'none' ? 'passed' : 'showed a card') + '</span>').join('') + '</div>' +
+        '<div class="ask"><div class="muted">You asked about ' + esc(names) + '</div><div class="who">' + (shower ? esc(nm(shower.p)) : 'Nobody') + '</div><div class="muted">' +
+        (shower ? 'showed you ' + (has ? 'the ' + esc(D.CARDS[sh.card]) : 'a card') : 'had any of these') + '</div></div>' +
+        (shower ? (has ? bigCard(D, sh.card) : '') : fan(D, e.cards)) + '<button class="btn" data-act="next">OK</button>';
+    }
     let h = '<div class="ask"><div class="muted">' + (e.t === 'a' ? 'Accusation' : 'Suggestion') + '</div><div class="who">' + esc(nmFull(e.by)) + '</div><div class="muted">' + (e.t === 'a' ? 'accused' : 'asked about') + '</div></div>' + fan(D, e.cards);
     if (e.t === 'a') {
       h += '<div class="banner"><b>' + esc(nm(e.by)) + ' was wrong and is out of the game.</b><br>' + esc(names) + '</div>';

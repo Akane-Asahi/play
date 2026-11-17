@@ -265,7 +265,8 @@ async function play(db, cs, code, plan, until) {
   assert.equal(db.read('rooms/' + code + '/game').phase, 'end');
   const w2 = cs.filter((c) => c.uid !== mover.uid && !c.q('.fc.tap'));
   w2.forEach((c) => { if (c.q('[data-act=next]')) { assert(c.q('.modal'), 'result pop-up stays'); c.click('[data-act=next]'); } assert(!c.q('.modal'), c.uid + ' pop-up closes after Next turn'); });
-  assert(!mover.q('.modal'), 'my own suggestion needs no pop-up');
+  assert(mover.q('.modal [data-act=next]') && !mover.q('.card.act .bigc, .card.act .banner'), 'my result is in the pop-up, not the turn section');
+  mover.click('[data-act=next]'); assert(!mover.q('.modal') && mover.q('[data-act=end]'), 'OK closes it');
   assert(!/Your cards/.test(mover.text()), 'no Your cards section');
   console.log('H ok: pop-up waits for Next turn');
 }
