@@ -4,7 +4,7 @@ import * as B from './board.js';
 const TW = 40, TH = 20, WH = 14, TOP = WH + 12, OX = B.H * TW / 2;
 // Room scenes (isometric cutaway pictures), by room name without spaces/punctuation, lowercase.
 // Drawn on the board in place of the plain room. ratio = picture height / width.
-export const ROOM_ART = { library: { src: 'img/rooms/library-board.webp', ratio: 463 / 720, w: 176 }, study: { src: 'img/rooms/study-board.webp', ratio: 466 / 720, w: 172 } };
+export const ROOM_ART = { library: { src: 'img/rooms/library-board.webp', ratio: 463 / 720, w: 176 }, study: { src: 'img/rooms/study-board.webp', ratio: 754 / 900, w: 176 } };
 export const SEAT_COLORS = ['#c62828', '#e1ad01', '#f2efe8', '#2e7d32', '#1565c0', '#8e24aa'];
 const FLOORS = ['#8b8f78', '#7d6c93', '#5c8a6a', '#94705c', '#4c7b72', '#7d5d49', '#8e5c6b', '#8d8062', '#5c6d8f'];
 const P = (x, y, z) => [(x - y) * TW / 2 + OX, (x + y) * TH / 2 + TOP - (z || 0)];
@@ -66,7 +66,8 @@ export function boardSvg(o) {
     s += poly(quad(x, y, 1, 1), 'fill="' + (doorAt[i] ? '#8c7446' : (x + y) % 2 ? '#4b5053' : '#44494c') + '" stroke="#2f3336" stroke-width=".7"');
     if (starts.has(i)) { const c = P(x + 0.5, y + 0.5); s += '<ellipse cx="' + c[0] + '" cy="' + c[1] + '" rx="9" ry="4.5" fill="none" stroke="#8d949a" stroke-width="1" stroke-dasharray="2 2"/>'; }
   }
-  // rooms
+  // rooms (names go on top of everything, so a tall picture never hides a neighbour's name)
+  let labels = '';
   for (let k = 0; k < B.ROOMS; k++) {
     const r = B.roomRect(k), x0 = r.x, y0 = r.y;
     s += poly(quad(x0, y0, 4, 4), 'fill="' + FLOORS[k] + '"');
@@ -75,7 +76,7 @@ export function boardSvg(o) {
       const w = art.w, h = w * art.ratio, cx = P(x0 + 2, y0 + 2)[0], by = P(x0 + 4, y0 + 4)[1] + 9;
       s += '<image href="' + art.src + '" x="' + (cx - w / 2).toFixed(1) + '" y="' + (by - h).toFixed(1) + '" width="' + w + '" height="' + h.toFixed(1) + '" pointer-events="none"/>';
       const c = P(x0 + 2, y0 + 2);
-      s += '<text class="rl" x="' + c[0] + '" y="' + (c[1] + 22) + '">' + esc(o.roomNames[k] || '') + '</text>';
+      labels += '<text class="rl" x="' + c[0] + '" y="' + (c[1] + 22) + '">' + esc(o.roomNames[k] || '') + '</text>';
       continue;
     }
     for (let t = 1; t < 4; t++) s += line(P(x0 + t, y0), P(x0 + t, y0 + 4), 'stroke="rgba(0,0,0,.13)" stroke-width=".7"') + line(P(x0, y0 + t), P(x0 + 4, y0 + t), 'stroke="rgba(0,0,0,.13)" stroke-width=".7"');
@@ -98,9 +99,10 @@ export function boardSvg(o) {
       if (d.side === 's') s += line(P(x0 + 2.1, y0 + 4), P(x0 + 2.9, y0 + 4), 'stroke="#e6c67c" stroke-width="2.8"');
     });
     const c = P(x0 + 2, y0 + 2), words = String(o.roomNames[k] || '').split(' ');
-    s += '<text class="rl" x="' + c[0] + '" y="' + (c[1] + (words.length > 1 ? -3 : 5)) + '">' +
+    labels += '<text class="rl" x="' + c[0] + '" y="' + (c[1] + (words.length > 1 ? -3 : 5)) + '">' +
       words.map((w, i) => '<tspan x="' + c[0] + '"' + (i ? ' dy="15"' : '') + '>' + esc(w) + '</tspan>').join('') + '</text>';
   }
+  s += labels;
   // where I can go
   if (o.go) {
     o.go.cells.forEach((_, i) => { const [x, y] = B.xy(i); s += poly(quad(x, y, 1, 1), 'class="go" data-act="go" data-d="' + i + '"'); });
