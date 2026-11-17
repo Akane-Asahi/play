@@ -12,7 +12,7 @@ import { startApp } from '../clue/app.js';
 import { FakeDb } from './fake-net.js';
 const qs = new URLSearchParams(location.search), step = qs.get('step') || 'turn', reveal = qs.get('t');
 const db = new FakeDb(), wait = (ms) => new Promise((r) => setTimeout(r, ms));
-startApp({ net: db.client('me'), doc: document, win: window, delays: { bot: step === 'end' ? 0 : step === 'watch' ? 400 : 150, none: 150, reveal: reveal == null ? undefined : +reveal } });
+startApp({ net: db.client('me'), doc: document, win: window, delays: { ...(step === 'end' ? { min: 0 } : {}), bot: step === 'end' ? 0 : step === 'watch' ? 400 : 150, none: 150, reveal: reveal == null ? undefined : +reveal } });
 const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); return !!el; };
 (async () => {
   if (step === 'home') return;
@@ -34,6 +34,7 @@ const click = (sel) => { const el = document.querySelector(sel); if (el) el.clic
     if (step === 'watch' && g.phase === 'answer' && g.cur.by !== 'me' && g.cur.order[g.cur.i] !== 'me') return;
     if (step === 'result' && document.querySelector('[data-act=end]') && g.log.length > 4) return;
     if (g.over) return;
+    if (step === 'end' && click('[data-act=next]')) { await wait(30); continue; }
     if (!click('.fc.tap') && !click('[data-act=pass]') && !click('[data-act=end]') && document.querySelector('[data-act=suggest]')) {
       [0, 1, 2].forEach((k) => { const o = document.querySelectorAll('[data-act=pick][data-k="' + k + '"]'); o[Math.floor(Math.random() * o.length)].click(); });
       click('[data-act=suggest]');

@@ -328,7 +328,7 @@ export function startApp({ net, doc, win, delays }) {
   function lobbyHtml() {
     const ord = order(), host = isHost(), full = ord.length >= E.MAX_PLAYERS;
     let h = '<section class="card"><h2>Invite friends</h2><p class="muted">Share this link. Anyone who opens it can join.</p>' +
-      '<div class="row"><input type="text" class="grow" id="share" readonly value="' + esc(shareUrl()) + '"><button class="btn ghost fit" data-act="copy">Copy</button></div></section>';
+      '<div class="row"><input type="text" class="grow" id="share" readonly value="' + esc(shareUrl()) + '"><button class="btn ghost fit' + (ui.copied ? ' done' : '') + '" data-act="copy">' + (ui.copied ? 'Copied ✓' : 'Copy') + '</button></div></section>';
     h += '<section class="card"><h2>Players (' + ord.length + ' of up to ' + E.MAX_PLAYERS + ')</h2><div class="plist">';
     ord.forEach((pid) => {
       const p = players[pid];
@@ -746,13 +746,20 @@ export function startApp({ net, doc, win, delays }) {
     const html = h + (inGame ? playersPanel() : '');
     if (html !== ui.lastHtml) { $('view').innerHTML = html; ui.lastHtml = html; }    // same picture: leave it alone, so nothing re-animates
     $('msg').textContent = msg;
+    $('msg').className = 'toast ' + (ui.info ? 'ok' : 'warn');
     syncHold(inGame && !game.over && !!ui.holdWant);
     if (roomCode && meta && meta.status === 'playing') { hostTick(); }
   }
 
   // ---------- events ----------
+  // A short note that appears over the page and goes away by itself (errors stay until the next tap).
+  function toast(text) {
+    msg = text; ui.info = true;
+    win.clearTimeout(ui.toastT);
+    ui.toastT = win.setTimeout(() => { if (ui.info) { msg = ''; ui.info = false; render(); } }, 2200);
+  }
   async function run(fn) {
-    try { msg = ''; await fn(); } catch (err) { msg = (err && err.message) || String(err); }
+    try { msg = ''; ui.info = false; await fn(); } catch (err) { msg = (err && err.message) || String(err); ui.info = false; }
     render();
   }
 
@@ -764,7 +771,9 @@ export function startApp({ net, doc, win, delays }) {
   });
   doc.addEventListener('change', (e) => { if (e.target.id === 'edition') ui.edition = e.target.value; });
 
+  doc.addEventListener('touchstart', () => {}, { passive: true });
   doc.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('button') && win.navigator.vibrate) { try { win.navigator.vibrate(8); } catch (err) { /* not everywhere */ } }
     const el = e.target.closest ? e.target.closest('[data-act]') : null;
     if (!el || el.disabled || el.classList.contains('off')) return;
     const a = el.getAttribute('data-act');
@@ -780,8 +789,8 @@ export function startApp({ net, doc, win, delays }) {
       case 'go': run(() => doMove(+el.getAttribute('data-d'))); break;
       case 'join': run(() => { const c = (ui.code || '').trim().toUpperCase(); if (!c) throw new Error('Type the room code first.'); return joinRoom(c); }); break;
       case 'copy': run(async () => {
-        try { await win.navigator.clipboard.writeText(shareUrl()); msg = 'Link copied.'; }
-        catch (err) { const i = $('share'); if (i) { i.focus(); i.select(); } msg = 'Select the link and copy it.'; }
+        try { await win.navigator.clipboard.writeText(shareUrl()); ui.copied = true; win.clearTimeout(ui.copiedT); ui.copiedT = win.setTimeout(() => { ui.copied = false; render(); }, 2200); toast('Link copied'); }
+        catch (err) { const i = $('share'); if (i) { i.focus(); i.select(); } toast('Select the link and copy it'); }
       }); break;
       case 'bot': run(() => addBot(el.dataset.n)); break;
       case 'kick': run(() => removePlayer(el.dataset.p)); break;
