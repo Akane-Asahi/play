@@ -71,7 +71,7 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 .eb{background:#fb6759 url(img/cardback.webp) center/100% 100% no-repeat}
 .ec .ef.fc{transform:rotateY(180deg);animation:none}
 .stampwrap{position:absolute;inset:0;display:flex;align-items:flex-start;padding-top:78px;justify-content:center;pointer-events:none;z-index:9}
-.stamp{font-size:46px;font-weight:900;letter-spacing:5px;text-transform:uppercase;color:#d32f2f;border:6px solid #d32f2f;border-radius:10px;padding:2px 16px 0;background:rgba(255,248,235,.9);box-shadow:inset 0 0 0 2px rgba(211,47,47,.35),0 6px 18px rgba(0,0,0,.4);mix-blend-mode:normal;animation:slam .5s cubic-bezier(.2,.9,.3,1) calc(var(--d) - var(--t)) both}
+.stamp{font-size:46px;font-weight:900;letter-spacing:5px;text-transform:uppercase;color:#d32f2f;border:6px solid #d32f2f;border-radius:10px;padding:2px 16px 0;background:transparent;text-shadow:0 1px 4px rgba(0,0,0,.55);box-shadow:inset 0 0 0 2px rgba(211,47,47,.35);mix-blend-mode:normal;animation:slam .5s cubic-bezier(.2,.9,.3,1) calc(var(--d) - var(--t)) both}
 @keyframes slam{0%{opacity:0;transform:rotate(-12deg) scale(3.6)}55%{opacity:1;transform:rotate(-12deg) scale(.9)}75%{transform:rotate(-12deg) scale(1.06)}100%{opacity:1;transform:rotate(-12deg) scale(1)}}
 .fin-actions{display:flex;gap:10px;margin-top:6px;animation:finalup .5s ease-out calc(var(--d) - var(--t)) both}
 .fin-actions .btn{margin-top:12px}
