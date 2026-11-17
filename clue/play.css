@@ -38,3 +38,9 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 .tt th:nth-child(1){width:5%}.tt th:nth-child(2){width:17%}.tt th:nth-child(3){width:23%}.tt th:nth-child(4){width:20%}.tt th:nth-child(5){width:18%}.tt th:nth-child(6){width:17%}
 .tt .evsub{text-align:left}
 .fc b.long,.fc.k1.art b.long,.fc.k2.art b.long{font-size:13.5px}
+/* the card you were just shown */
+.bigcard.shownc{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:190px;margin:12px auto 14px;text-align:center;color:#fff;animation:fanC .5s cubic-bezier(.22,1.2,.36,1) both}
+.bigcard.shownc .pic{z-index:0}
+.bigcard.shownc small{top:11%;left:0;right:0;z-index:2}
+.bigcard.shownc b{position:relative;z-index:2;display:block;width:100%;font-size:22px;padding:0 8px 26px;text-shadow:0 2px 8px rgba(0,0,0,.85)}
+.bigcard.shownc:not(.art){border:2px solid var(--accent);background:var(--bg);justify-content:center;aspect-ratio:.62}

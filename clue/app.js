@@ -69,6 +69,12 @@ export function startApp({ net, doc, win, delays }) {
     const style = col ? ' style="background:' + col[0] + ';color:' + col[1] + (col[2] ? ';border:1px solid ' + col[2] : '') + '"' : '';
     return '<span class="chip' + (col ? ' sus' : '') + (cls || '') + '"' + style + (attrs || '') + '>' + esc(D.CARDS[c]) + '</span>';
   }
+  // One card, big, for the card a player was just shown.
+  function bigCard(D, c) {
+    const src = portrait(D, c);
+    return '<div class="bigcard art shownc">' + (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
+      '<small>' + S.CAT_NAMES[D.catOf(c)] + '</small><b>' + esc(D.CARDS[c]) + '</b></div>';
+  }
   // The three-card fan. opts: tap(c) -> can be tapped, dead(c) -> greyed out, seen(c) -> eye, hint
   function fan(D, cards, opts) {
     opts = opts || {};
@@ -336,8 +342,9 @@ export function startApp({ net, doc, win, delays }) {
     const cards = e.cards.map((c) => D.CARDS[c]).join(', ');
     if (!shower) return '<div class="banner"><b>Nobody had any of these.</b><br>' + esc(cards) + '</div>';
     if (mine) {
-      const sh = myShown && myShown[n];
-      return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed you ' + (sh && sh.card != null ? esc(D.CARDS[sh.card]) : 'a card') + '.</b><br>You asked for ' + esc(cards) + '.</div>';
+      const sh = myShown && myShown[n], has = sh && sh.card != null;
+      return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed you ' + (has ? esc(D.CARDS[sh.card]) : 'a card') + '.</b><br>You asked for ' + esc(cards) + '.</div>' +
+        (has ? bigCard(D, sh.card) : '');
     }
     return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.</b><br>' + esc(cards) + '</div>';
   }

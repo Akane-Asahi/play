@@ -122,7 +122,9 @@ async function play(db, cs, code, plan, until) {
   assert(cs[0].text().includes('you are out'));
   // h2 keeps asking for cards h1 holds: h1 must still be asked, and sees the eye the second time
   const h1hand = db.read('rooms/' + code + '/hands/h1');
-  const pick = [0, 1, 2].map((k) => h1hand.find((c) => D.catOf(c) === k) ?? (D.CS[k] + 0));
+  // cards h1 holds; where h1 has none in a category, a card in the envelope (nobody can show it)
+  const pick = [0, 1, 2].map((k) => h1hand.find((c) => D.catOf(c) === k) ?? env.find((c) => D.catOf(c) === k));
+  assert(pick.some((c) => h1hand.includes(c)), 'h1 holds at least one picked card');
   let eyes = 0, asks = 0;
   g = await play(db, cs, code, (c) => (c.uid === 'h2' ? { cards: pick } : null), (x) => {
     if (x.phase === 'answer' && x.cur.by === 'h2' && x.cur.order[x.cur.i] === 'h1' && cs[0].q('.fc.tap')) { asks++; if (cs[0].q('.fc .seen')) eyes++; }
@@ -132,6 +134,27 @@ async function play(db, cs, code, plan, until) {
   g = await play(db, cs, code);
   assert(g.over.winner !== 'h1');
   console.log('C ok: wrong accusation, out player still answers, eye marker; winner', g.over.winner);
+}
+
+// D: the asker sees the shown card drawn as a card; others do not
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], []);
+  const D = S.makeDeck(S.EDITIONS[0]);
+  const h2 = db.read('rooms/' + code + '/hands/h2'), h3 = db.read('rooms/' + code + '/hands/h3');
+  const mine = db.read('rooms/' + code + '/hands/h1');
+  const cat = (k) => (h2.find((c) => D.catOf(c) === k) ?? (D.CS[k] + 0));
+  const cards = [0, 1, 2].map((k) => { const own = mine.filter((c) => D.catOf(c) === k); return h2.find((c) => D.catOf(c) === k) ?? [...Array(D.SZ[k])].map((_, i) => D.CS[k] + i).find((c) => !mine.includes(c)); });
+  let g = await play(db, cs, code, (c) => (c.uid === 'h1' ? { cards } : null), (x) => x.phase === 'end');
+  await wait(10);
+  assert.equal(g.log.length, 1);
+  const shower = g.log[0].resp.find((r) => r.r === 'showed');
+  const sh = db.read('rooms/' + code + '/shown/h1/0');
+  assert(shower && sh && sh.card != null, 'asker got a shown card');
+  const big = cs[0].q('.bigcard.shownc');
+  assert(big && big.textContent.includes(D.CARDS[sh.card]), 'asker sees the card drawn');
+  assert(!cs[1].q('.bigcard.shownc') && !cs[2].q('.bigcard.shownc'), 'other players do not see it');
+  console.log('D ok: asker sees the shown card as a card');
 }
 console.log('app tests ok');
 process.exit(0);
