@@ -200,3 +200,20 @@ main:has(.float){padding-bottom:230px}
 .float .fsum{color:#c9bfae;margin:0 6px 12px;line-height:1.35}
 .float .fsum i{color:#a99c86}
 .notes .nt td:first-child .muted{display:inline-block;text-decoration:none;margin-left:4px;font-size:12px}
+
+/* ---- pop-up: the players sit under the cards ---- */
+.fan.cont .fc{animation-delay:calc(var(--ft,0s) * -1)!important}
+.bigcard.shownc{animation-delay:calc(var(--ft,0s) * -1)}
+.car{position:relative;overflow:hidden;margin:6px -14px 4px;padding:0 0 2px}
+.car::before,.car::after{content:'';position:absolute;top:0;bottom:0;width:36px;z-index:2;pointer-events:none}
+.car::before{left:0;background:linear-gradient(90deg,var(--card),transparent)}
+.car::after{right:0;background:linear-gradient(270deg,var(--card),transparent)}
+.trk{display:flex;width:max-content;margin-left:50%;transform:translateX(var(--to));animation:carslide .6s cubic-bezier(.3,.7,.2,1) calc(var(--t,0s) * -1) both}
+@keyframes carslide{from{transform:translateX(var(--from))}to{transform:translateX(var(--to))}}
+.ci{flex:0 0 124px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.ci .cl{height:17px;font-size:12px;line-height:17px;letter-spacing:.4px;color:var(--mute);white-space:nowrap}
+.ci .cp{max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--mute);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:600}
+.ci.on .cp{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:750}
+.ci.on .cl{color:var(--ink)}
+.ci.past{opacity:.4}
+@media (prefers-reduced-motion:reduce){.trk{animation:none}}

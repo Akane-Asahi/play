@@ -7,13 +7,14 @@ import { loadSolver } from './load-solver.js';
 const S = loadSolver();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+let DL = { bot: 0, none: 0, min: 0 };          // delays for every page: no waiting, unless a test says otherwise
 function open(db, uid, query) {
   const dom = new JSDOM('<header><span class="hside"><button id="players-btn" data-act="players" hidden></button></span><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
     { url: 'https://example.test/play/clue/' + (query || ''), pretendToBeVisual: true });
   const win = dom.window;
   win.ClueSolver = S;
   if (!win.crypto || !win.crypto.getRandomValues) Object.defineProperty(win, 'crypto', { value: webcrypto });
-  const app = startApp({ net: db.client(uid), doc: win.document, win, delays: { bot: 0, none: 0 } });
+  const app = startApp({ net: db.client(uid), doc: win.document, win, delays: DL });
   const q = (sel) => win.document.querySelector(sel), qa = (sel) => Array.from(win.document.querySelectorAll(sel));
   const click = (sel) => { const el = typeof sel === 'string' ? q(sel) : sel; assert(el, 'missing ' + sel + ' for ' + uid + '\n' + q('#view').innerHTML.slice(0, 400)); el.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); };
   const type = (id, v) => { const el = q('#' + id); assert(el, 'missing #' + id); el.value = v; el.dispatchEvent(new win.Event('input', { bubbles: true })); };
@@ -302,6 +303,50 @@ async function play(db, cs, code, plan, until) {
   assert.equal(db.read('rooms/' + code), null, 'room deleted');
   assert(/Game cancelled/.test(guest.text()), 'other players are told');
   console.log('J ok: host cancels and the room is deleted');
+}
+// K: the pop-up keeps every state up for a minimum time, names sit under the cards,
+// and the bots wait while someone still has a pop-up open
+{
+  DL = { bot: 0, none: 0, min: 250 };
+  const db = new FakeDb();
+  const host = open(db, 'h1'); await wait(5);
+  host.type('name', 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m=fast]'); await wait(10);
+  const code = host.app.state().roomCode;
+  host.click('[data-act=bot][data-n=Sir]'); await wait(5);
+  const h2 = open(db, 'h2', '?room=' + code); await wait(5);
+  h2.type('name', 'Hana'); h2.click('[data-act=join]'); await wait(10);
+  host.click('[data-act=start]'); await wait(20);
+  assert.equal(db.read('rooms/' + code + '/game').turn, 'h1');
+  const hand2 = db.read('rooms/' + code + '/hands/h2');
+  [0, 1, 2].forEach((k) => { const o = host.qa('tr.pk td[data-act=pick][data-k="' + k + '"]'); host.click(o.find((x) => !hand2.includes(+x.dataset.c)) || o[0]); });
+  host.click('[data-act=suggest]'); await wait(60);
+  // Sir (a bot) has already answered for real, but Hana still sees him as the one thinking
+  assert.equal(db.read('rooms/' + code + '/game').cur.i, 1, 'the bot has moved on');
+  assert.equal(h2.q('.mcard .ci.on .cp').textContent, 'Sir', 'Sir stays up for the minimum time');
+  assert.equal(h2.q('.mcard .ci.on .cl').textContent, 'Showing…');
+  assert(!h2.q('[data-act=pass]'), 'her own turn to answer has not arrived on screen yet');
+  const fan = h2.q('.mcard .fan'), car = h2.q('.mcard .car');
+  assert(fan && car && (fan.compareDocumentPosition(car) & 4), 'names are under the cards');
+  await wait(320);
+  assert.equal(h2.q('.mcard .ci.on .cp').textContent, 'You', 'then it is her turn');
+  h2.click('[data-act=pass]'); await wait(300);
+  assert.equal(db.read('rooms/' + code + '/game').phase, 'end');
+  for (let i = 0; i < 60 && !(host.q('[data-act=next]') && h2.q('[data-act=next]')); i++) await wait(50);
+  assert.equal(h2.q('.mcard .ci.on .cl').textContent, 'Finishing…', 'the result ends on the player finishing the turn');
+  assert(h2.q('.mcard .fan').compareDocumentPosition(h2.q('.mcard .car')) & 4, 'and names are still under the cards');
+  assert.equal(typeof db.read('rooms/' + code + '/players/h2/hold'), 'number', 'Hana is holding the game');
+  host.click('[data-act=next]'); host.click('[data-act=end]'); await wait(30);
+  const g1 = db.read('rooms/' + code + '/game');
+  assert.equal(g1.turn, 'bot-sir');
+  await wait(500);                                          // Sir would have moved long ago, if nobody was reading
+  const g2 = db.read('rooms/' + code + '/game');
+  assert(g2.turn === 'bot-sir' && g2.phase === 'suggest' && (g2.log || []).length === 1, 'the bot waits for Hana to tap Next turn: ' + JSON.stringify(g2));
+  h2.click('[data-act=next]'); await wait(80);
+  const g3 = db.read('rooms/' + code + '/game');
+  assert(g3.phase === 'answer' || (g3.log || []).length === 2, 'then the bot plays');
+  assert.equal(db.read('rooms/' + code + '/players/h2/hold'), null, 'Hana lets go of the game');
+  DL = { bot: 0, none: 0, min: 0 };
+  console.log('K ok: states last a minimum, names under the cards, bots wait for Next turn');
 }
 console.log('app tests ok');
 process.exit(0);

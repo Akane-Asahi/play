@@ -6,7 +6,7 @@ import { boardSvg, dieSvg, SEAT_COLORS } from './boardview.js';
 
 export function startApp({ net, doc, win, delays }) {
   const S = win.ClueSolver;
-  const D0 = { bot: 1100, none: 900, ...(delays || {}) };
+  const D0 = { bot: 3000, none: 900, min: 3000, ...(delays || {}) };   // min: how long each state stays on screen
   const NAME_KEY = 'clues-play-name';
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const SUS_COLORS = { scarlett: ['#c62828', '#ffffff'], mustard: ['#e1ad01', '#231a00'], white: ['#ffffff', '#222222', '#b9b4aa'],
@@ -73,15 +73,15 @@ export function startApp({ net, doc, win, delays }) {
     return '<span class="chip' + (col ? ' sus' : '') + (cls || '') + '"' + style + (attrs || '') + '>' + esc(D.CARDS[c]) + '</span>';
   }
   // One card, big, for the card a player was just shown.
-  function bigCard(D, c) {
+  function bigCard(D, c, ft) {
     const src = portrait(D, c);
-    return '<div class="bigcard art shownc">' + (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
+    return '<div class="bigcard art shownc"' + (ft != null ? ' style="--ft:' + ft + 's"' : '') + '>' + (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
       '<small>' + S.CAT_NAMES[D.catOf(c)] + '</small><b>' + esc(D.CARDS[c]) + '</b></div>';
   }
   // The three-card fan. opts: tap(c) -> can be tapped, dead(c) -> greyed out, seen(c) -> eye, hint
   function fan(D, cards, opts) {
     opts = opts || {};
-    return '<div class="fan">' + cards.map((c, i) => {
+    return '<div class="fan' + (opts.ft != null ? ' cont" style="--ft:' + opts.ft + 's' : '') + '">' + cards.map((c, i) => {
       const tap = opts.tap && opts.tap(c), live = !(opts.dead && opts.dead(c)), src = portrait(D, c);
       return '<div class="fc k' + i + (live ? ' live' : '') + (tap ? ' tap' : '') + (src ? ' art' : '') + '"' + (tap ? ' data-act="show" data-c="' + c + '"' : '') + '><div class="in">' +
         (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
@@ -233,7 +233,7 @@ export function startApp({ net, doc, win, delays }) {
     }
     if (g.phase === 'answer') {
       const p = E.asked(g), cur = g.cur;
-      if (!isBot(p)) return false;
+      if (!isBot(p) || onHold()) return false;
       await sleep(D0.bot);
       const hand = (await net.get(room('hands/' + p))) || [];
       const held = cur.cards.filter((c) => hand.includes(c));
@@ -248,6 +248,7 @@ export function startApp({ net, doc, win, delays }) {
     }
     if (['suggest', 'end', 'roll', 'move'].includes(g.phase) && isBot(g.turn)) {
       const p = g.turn;
+      if (onHold()) return false;
       await sleep(D0.bot);
       const key = p + ':' + E.logOf(g).length + ':' + (meta.startedAt || 0);
       if (!botPlan || botPlan.key !== key) {              // one think per turn, not one per step
@@ -270,6 +271,22 @@ export function startApp({ net, doc, win, delays }) {
       return tx((x) => E.suggest(x, p, cards, ord));
     }
     return false;
+  }
+  // A player with a pop-up open (or still catching up with one) holds the bots, so the game can't run
+  // ahead of what they are reading. Stored on their own player entry, refreshed while it lasts.
+  const HOLD_MS = 90000;
+  function onHold() {
+    const now = Date.now();
+    return Object.values(players).some((p) => p && !p.bot && p.hold && now - p.hold < HOLD_MS);
+  }
+  function syncHold(want) {
+    if (!roomCode || !players[uid]) return;
+    const now = Date.now();
+    win.clearTimeout(ui.beatT);
+    if (want) {
+      if (!ui.holdAt || now - ui.holdAt > 30000) { ui.holdAt = now; Promise.resolve(net.set(room('players/' + uid + '/hold'), now)).catch(() => {}); }
+      ui.beatT = win.setTimeout(render, Math.max(0, 30000 - (now - ui.holdAt)) + 50);
+    } else if (ui.holdAt) { ui.holdAt = 0; Promise.resolve(net.set(room('players/' + uid + '/hold'), null)).catch(() => {}); }
   }
   async function hostTick() {
     if (!isHost()) return;
@@ -408,14 +425,6 @@ export function startApp({ net, doc, win, delays }) {
     return h + '</aside>';
   }
 
-  function respPills(cur) {
-    const resp = cur.resp || [];
-    return '<div class="pills">' + cur.order.map((p, i) => {
-      const r = resp[i];
-      return '<span class="pill' + (i === cur.i ? ' on' : '') + (r ? ' done' : '') + '">' + esc(nm(p)) + (r ? ' · ' + (r.r === 'none' ? 'passed' : 'showed a card') : '') + '</span>';
-    }).join('') + '</div>';
-  }
-
   function lastResultHtml(D, mine) {
     const log = E.logOf(game), n = log.length - 1, e = log[n];
     if (!e || e.t !== 's') return '';
@@ -469,33 +478,20 @@ export function startApp({ net, doc, win, delays }) {
     return h + '</div>';
   }
 
-  // What the pop-up shows while a suggestion or accusation is being answered.
-  function liveHtml(D) {
-    const g = game, me = uid;
-    if (g.phase === 'answer' && g.cur) {
-      const cur = g.cur, who = E.asked(g), iAsk = cur.by === me, meAsked = who === me;
-      let h = respPills(cur) + '<div class="ask"><div class="muted">' + (iAsk ? 'You\'re asking' : esc(nm(cur.by)) + ' is asking') + '</div><div class="who">' + esc(nm(who)) + '</div><div class="muted">';
-      if (meAsked) {
-        const held = myHand ? cur.cards.filter((c) => myHand.includes(c)) : [];
-        const before = E.shownTo(myShown, cur.by);
-        h += (held.length ? 'Pick the card you show' : 'You have none of these') + '</div></div>';
-        h += fan(D, cur.cards, { tap: (c) => held.includes(c), dead: (c) => !held.includes(c), seen: (c) => held.includes(c) && before.includes(c), hint: 'Tap to show' });
-        h += held.length ? '<p class="muted center">Only ' + esc(nm(cur.by)) + ' sees the card you tap. 👁️ marks a card you already showed them.</p>'
-          : (myHand ? '<button class="btn" data-act="pass">Pass</button>' : '');
-      } else {
-        h += 'if they have any of these</div></div>' + fan(D, cur.cards);
-        h += '<p class="muted center">' + (iAsk ? 'If ' + esc(nm(who)) + ' has one, you will see it.' : 'You won\'t see which card is shown.') + '</p>';
-      }
-      return h;
-    }
-    if (g.phase === 'accusing' && g.acc) {
-      return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">' + (g.acc.by === me ? 'You accuse' : 'accuses') + '</div></div>' +
-        fan(D, g.acc.cards) + '<p class="muted center">Checking the envelope…</p>';
-    }
-    return '';
-  }
-
+  // Someone else's turn: each state (rolling, moving, choosing, finishing) stays up for at least D0.min,
+  // even when the player finishes it sooner. My own turn is never held back.
   function actionHtml(D) {
+    const raw = actionRaw(D), g = game;
+    if (g.turn === uid || !(D0.min > 0)) { ui.lbl = null; return raw; }
+    const key = g.phase + ':' + g.turn + ':' + E.logOf(g).length, now = Date.now(), L = ui.lbl;
+    if (!L || L.sk !== meta.startedAt) { ui.lbl = { sk: meta.startedAt, key, html: raw, at: now }; return raw; }
+    if (L.key === key) { L.html = raw; return raw; }
+    if (now - L.at >= D0.min) { L.key = key; L.html = raw; L.at = now; return raw; }
+    win.clearTimeout(ui.lblT);
+    ui.lblT = win.setTimeout(render, L.at + D0.min - now + 30);
+    return L.html;
+  }
+  function actionRaw(D) {
     const g = game, me = uid;
     if (g.phase === 'answer' && g.cur) return '<div class="ask"><div class="muted">Turn</div><div class="who">' + esc(nmFull(g.turn)) + '</div><div class="muted">is waiting for answers</div></div>';
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
@@ -608,29 +604,89 @@ export function startApp({ net, doc, win, delays }) {
     while (ui.seen < log.length && skippable(log[ui.seen])) ui.seen++;
     return ui.seen < log.length ? ui.seen : -1;
   }
-  // What someone else just did, waiting until I tap Next turn.
-  function resultHtml(D, i) {
-    const e = E.logOf(game)[i], names = e.cards.map((c) => D.CARDS[c]).join(', ');
-    if (e.t === 's' && e.by === uid) {                       // my own suggestion: the card I was shown
-      const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed'), sh = myShown && myShown[i], has = sh && sh.card != null;
-      return '<div class="pills">' + resp.map((r) => '<span class="pill done">' + esc(nm(r.p)) + ' · ' + (r.r === 'none' ? 'passed' : 'showed a card') + '</span>').join('') + '</div>' +
-        '<div class="ask"><div class="muted">You asked about ' + esc(names) + '</div><div class="who">' + (shower ? esc(nm(shower.p)) : 'Nobody') + '</div><div class="muted">' +
-        (shower ? 'showed you ' + (has ? 'the ' + esc(D.CARDS[sh.card]) : 'a card') : 'had any of these') + '</div></div>' +
-        (shower ? (has ? bigCard(D, sh.card) : '') : fan(D, e.cards)) + '<button class="btn" data-act="next">OK</button>';
-    }
-    let h = '<div class="ask"><div class="muted">' + (e.t === 'a' ? 'Accusation' : 'Suggestion') + '</div><div class="who">' + esc(nmFull(e.by)) + '</div><div class="muted">' + (e.t === 'a' ? 'accused' : 'asked about') + '</div></div>' + fan(D, e.cards);
-    if (e.t === 'a') {
-      h += '<p class="rnote">' + esc(nm(e.by)) + ' was wrong and is out of the game.</p>';
+  // ---------- the pop-up ----------
+  // A suggestion or accusation plays out as a row of players under the cards. Whoever is thinking sits in a
+  // white pill in the middle with their state above; players still in line wait on the right; players who
+  // have answered slide off to the left. Each state stays up for at least D0.min, even if the real player
+  // was faster, and the finished result waits for a tap on Next turn.
+  function popup(D) {
+    const g = game, log = E.logOf(g), sk = meta.startedAt || 0;
+    let P;
+    if (g.phase === 'answer' && g.cur) {
+      const c = g.cur;
+      P = { key: sk + ':' + c.n, kind: 's', live: true, by: c.by, cards: c.cards, list: c.order.slice(), at: c.i };
+    } else if (g.phase === 'accusing' && g.acc) {
+      P = { key: sk + ':' + log.length, kind: 'a', live: true, by: g.acc.by, cards: g.acc.cards, list: [g.acc.by], at: 0 };
     } else {
-      const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed');
-      h += '<div class="pills">' + resp.map((r) => '<span class="pill done">' + esc(nm(r.p)) + ' · ' + (r.r === 'none' ? 'passed' : 'showed a card') + '</span>').join('') + '</div>';
-      h += '<p class="rnote">' + (shower ? esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.' : 'Nobody had any of these.') + '</p>';
+      const i = pendingEntry();
+      if (i < 0) return '';
+      const e = log[i];
+      P = { key: sk + ':' + i, kind: e.t, live: false, e, i, by: e.by, cards: e.cards, list: e.t === 's' ? (e.resp || []).map((r) => r.p) : [e.by] };
     }
-    return h + '<button class="btn" data-act="next">Next turn</button>';
+    P.stages = P.kind === 's'
+      ? P.list.map((p, k) => ({ i: k, label: 'Showing…' })).concat([{ i: P.list.length, label: 'Finishing…', fin: true }])
+      : [{ i: 0, label: 'Accusing…' }, { i: 0, label: 'Wrong', fin: true }];
+    const items = P.kind === 's' ? P.list.concat([P.by]) : [P.by];
+
+    // where the replay is: it catches up with the real state one stage at a time
+    const T = P.live ? P.at : P.stages.length - 1, now = Date.now();
+    let R = ui.rp;
+    if (!R || R.key !== P.key) R = ui.rp = { key: P.key, d: P.live ? T : 0, prev: P.live ? T : 0, since: now, first: now };
+    while (R.d < T && now - R.since >= D0.min) { R.prev = R.d; R.d++; R.since = now; }
+    win.clearTimeout(ui.rpT);
+    if (R.d < T) ui.rpT = win.setTimeout(render, Math.max(0, R.since + D0.min - now) + 30);
+    ui.holdWant = !P.live || R.d < T;                      // the bots wait while I'm still reading this
+    const st = P.stages[R.d], cur = R.d === T;             // cur: showing the real state, not a replay of an earlier one
+    const ft = Math.min(1, (now - R.first) / 1000).toFixed(2);
+    const fn = (o) => fan(D, P.cards, { ...(o || {}), ft });
+    const who = st.fin ? P.by : P.list[st.i];
+    let head, cards, note = '', btn = '';
+
+    if (P.kind === 'a' && !st.fin) {
+      head = '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(P.by)) + '</div><div class="muted">' + (P.by === uid ? 'You accuse' : 'accuses') + '</div></div>';
+      cards = fn(); note = '<p class="muted center">Checking the envelope…</p>';
+    } else if (P.kind === 'a') {
+      head = '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nmFull(P.by)) + '</div><div class="muted">accused</div></div>';
+      cards = fn(); note = '<p class="rnote">' + esc(nm(P.by)) + ' was wrong and is out of the game.</p>';
+      btn = '<button class="btn" data-act="next">Next turn</button>';
+    } else if (!st.fin) {
+      const iAsk = P.by === uid;
+      head = '<div class="ask"><div class="muted">' + (iAsk ? 'You\'re asking' : esc(nm(P.by)) + ' is asking') + '</div><div class="who">' + esc(nm(who)) + '</div><div class="muted">';
+      if (P.live && cur && who === uid) {                   // my turn to show a card
+        const held = myHand ? P.cards.filter((c) => myHand.includes(c)) : [];
+        const before = E.shownTo(myShown, P.by);
+        head += (held.length ? 'Pick the card you show' : 'You have none of these') + '</div></div>';
+        cards = fn({ tap: (c) => held.includes(c), dead: (c) => !held.includes(c), seen: (c) => held.includes(c) && before.includes(c), hint: 'Tap to show' });
+        note = held.length ? '<p class="muted center">Only ' + esc(nm(P.by)) + ' sees the card you tap. 👁️ marks a card you already showed them.</p>' : '';
+        btn = held.length ? '' : (myHand ? '<button class="btn" data-act="pass">Pass</button>' : '');
+      } else {
+        head += 'if they have any of these</div></div>';
+        cards = fn();
+        if (P.live && cur) note = '<p class="muted center">' + (iAsk ? 'If ' + esc(nm(who)) + ' has one, you will see it.' : 'You won\'t see which card is shown.') + '</p>';
+      }
+    } else {                                                // the finished suggestion
+      const e = P.e, resp = e.resp || [], shower = resp.find((r) => r.r === 'showed');
+      if (e.by === uid) {                                   // mine: the card I was shown
+        const sh = myShown && myShown[P.i], has = sh && sh.card != null, names = e.cards.map((c) => D.CARDS[c]).join(', ');
+        head = '<div class="ask"><div class="muted">You asked about ' + esc(names) + '</div><div class="who">' + (shower ? esc(nm(shower.p)) : 'Nobody') + '</div><div class="muted">' +
+          (shower ? 'showed you ' + (has ? 'the ' + esc(D.CARDS[sh.card]) : 'a card') : 'had any of these') + '</div></div>';
+        cards = shower ? (has ? bigCard(D, sh.card, ft) : '') : fn();
+        btn = '<button class="btn" data-act="next">OK</button>';
+      } else {
+        head = '<div class="ask"><div class="muted">Suggestion</div><div class="who">' + esc(nmFull(e.by)) + '</div><div class="muted">asked about</div></div>';
+        cards = fn();
+        note = '<p class="rnote">' + (shower ? esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.' : 'Nobody had any of these.') + '</p>';
+        btn = '<button class="btn" data-act="next">Next turn</button>';
+      }
+    }
+
+    const W = 124, x = (k) => -(k * W + W / 2) + 'px';
+    const car = '<div class="car"><div class="trk" style="--from:' + x(P.stages[R.prev].i) + ';--to:' + x(st.i) + ';--t:' + Math.min(0.8, (now - R.since) / 1000).toFixed(2) + 's">' +
+      items.map((p, k) => '<div class="ci' + (k === st.i ? ' on' : k < st.i ? ' past' : '') + '"><span class="cl">' + (k === st.i ? esc(st.label) : '') + '</span><span class="cp">' + esc(nm(p)) + '</span></div>').join('') + '</div></div>';
+    return head + cards + car + note + btn;
   }
   function modalHtml(D) {
-    let inner = liveHtml(D);
-    if (!inner) { const i = pendingEntry(); if (i >= 0) inner = resultHtml(D, i); }
+    const inner = popup(D);
     return inner ? '<div class="modal"><div class="mcard" role="dialog" aria-modal="true">' + inner + '</div></div>' : '';
   }
 
@@ -673,6 +729,7 @@ export function startApp({ net, doc, win, delays }) {
   }
 
   function render() {
+    ui.holdWant = false;
     const pill = $('code-pill');
     pill.hidden = !roomCode;
     if (roomCode) pill.textContent = 'Room ' + roomCode;
@@ -687,8 +744,10 @@ export function startApp({ net, doc, win, delays }) {
     if (ttl) ttl.innerHTML = inGame && !game.over ? 'Turn ' + (E.logOf(game).length + 1) + ' <span class="tdot">•</span> <span class="tname">' + esc(nm(game.turn)) + '</span>' : 'Clues';
     const pb = $('players-btn');
     if (pb) pb.hidden = !inGame;
-    $('view').innerHTML = h + (inGame ? playersPanel() : '');
+    const html = h + (inGame ? playersPanel() : '');
+    if (html !== ui.lastHtml) { $('view').innerHTML = html; ui.lastHtml = html; }    // same picture: leave it alone, so nothing re-animates
     $('msg').textContent = msg;
+    syncHold(inGame && !game.over && !!ui.holdWant);
     if (roomCode && meta && meta.status === 'playing') { hostTick(); }
   }
 
