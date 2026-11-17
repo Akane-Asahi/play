@@ -4,7 +4,7 @@ import * as B from './board.js';
 const TW = 40, TH = 20, WH = 14, TOP = WH + 12, OX = B.H * TW / 2;
 // Room scenes (isometric cutaway pictures), by room name without spaces/punctuation, lowercase.
 // Drawn on the board in place of the plain room. ratio = picture height / width.
-export const ROOM_ART = { library: { src: 'img/rooms/library-board.webp', ratio: 463 / 720 } };
+export const ROOM_ART = { library: { src: 'img/rooms/library-board.webp', ratio: 463 / 720, w: 176 }, study: { src: 'img/rooms/study-board.webp', ratio: 466 / 720, w: 172 } };
 export const SEAT_COLORS = ['#c62828', '#e1ad01', '#f2efe8', '#2e7d32', '#1565c0', '#8e24aa'];
 const FLOORS = ['#8b8f78', '#7d6c93', '#5c8a6a', '#94705c', '#4c7b72', '#7d5d49', '#8e5c6b', '#8d8062', '#5c6d8f'];
 const P = (x, y, z) => [(x - y) * TW / 2 + OX, (x + y) * TH / 2 + TOP - (z || 0)];
@@ -72,7 +72,7 @@ export function boardSvg(o) {
     s += poly(quad(x0, y0, 4, 4), 'fill="' + FLOORS[k] + '"');
     const art = ROOM_ART[String(o.roomNames[k] || '').toLowerCase().replace(/[^a-z]/g, '')];
     if (art) {
-      const w = 176, h = w * art.ratio, cx = P(x0 + 2, y0 + 2)[0], by = P(x0 + 4, y0 + 4)[1] + 9;
+      const w = art.w, h = w * art.ratio, cx = P(x0 + 2, y0 + 2)[0], by = P(x0 + 4, y0 + 4)[1] + 9;
       s += '<image href="' + art.src + '" x="' + (cx - w / 2).toFixed(1) + '" y="' + (by - h).toFixed(1) + '" width="' + w + '" height="' + h.toFixed(1) + '" pointer-events="none"/>';
       const c = P(x0 + 2, y0 + 2);
       s += '<text class="rl" x="' + c[0] + '" y="' + (c[1] + 22) + '">' + esc(o.roomNames[k] || '') + '</text>';
