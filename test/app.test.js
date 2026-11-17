@@ -317,7 +317,7 @@ async function play(db, cs, code, plan, until) {
   h2.type('name', 'Hana'); h2.click('[data-act=join]'); await wait(10);
   host.click('[data-act=start]'); await wait(20);
   assert.equal(db.read('rooms/' + code + '/game').turn, 'h1');
-  const hand2 = db.read('rooms/' + code + '/hands/h2');
+  const hand2 = db.read('rooms/' + code + '/hands/h2').concat(db.read('rooms/' + code + '/hands/bot-sir'));   // nobody can show a card: Sir and Hana both pass
   [0, 1, 2].forEach((k) => { const o = host.qa('tr.pk td[data-act=pick][data-k="' + k + '"]'); host.click(o.find((x) => !hand2.includes(+x.dataset.c)) || o[0]); });
   host.click('[data-act=suggest]'); await wait(60);
   // Sir (a bot) has already answered for real, but Hana still sees him as the one thinking
