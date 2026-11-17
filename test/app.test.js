@@ -289,5 +289,19 @@ async function play(db, cs, code, plan, until) {
   end.log.filter((e) => e.t === 's').forEach((e) => assert(e.cards[2] >= D.CS[2], 'suggestions name a room'));
   console.log('I ok: full game with dice and board,', end.log.length, 'log entries');
 }
+// J: the host cancels the game; the room is deleted and everyone is told
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2'], ['Sir']);
+  const host = cs[0], guest = cs[1];
+  assert(!guest.q('[data-act=cancel]'), 'only the host can cancel');
+  host.click('[data-act=cancel]'); host.click('[data-act=cancel-no]');
+  assert(db.read('rooms/' + code), 'Keep playing leaves the room alone');
+  await assert.rejects(guest.app.net ? guest.app.net.remove('rooms/' + code) : db.client(guest.uid).remove('rooms/' + code));
+  host.click('[data-act=cancel]'); host.click('[data-act=cancel-yes]'); await wait(10);
+  assert.equal(db.read('rooms/' + code), null, 'room deleted');
+  assert(/Game cancelled/.test(guest.text()), 'other players are told');
+  console.log('J ok: host cancels and the room is deleted');
+}
 console.log('app tests ok');
 process.exit(0);

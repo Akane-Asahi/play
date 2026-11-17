@@ -20,6 +20,7 @@ export function startApp({ net, doc, win, delays }) {
 
   let uid = null, roomCode = null;
   let meta = null, players = {}, game = null, myHand = null, myShown = null;
+  let gone = false;
   let unsubs = [];
   let msg = '';
   const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, choosing: false, selKey: null, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
@@ -136,7 +137,7 @@ export function startApp({ net, doc, win, delays }) {
     unsubs.forEach((u) => u());
     const onErr = (err) => { msg = 'Connection problem: ' + (err && err.message ? err.message : err); render(); };
     unsubs = [
-      net.on(room('meta'), (v) => { meta = v; render(); }, onErr),
+      net.on(room('meta'), (v) => { if (meta && !v) gone = true; meta = v; render(); }, onErr),
       net.on(room('players'), (v) => { players = v || {}; render(); }, onErr),
       net.on(room('game'), (v) => { game = v; render(); }, onErr),
       net.on(room('hands/' + uid), (v) => { myHand = v; render(); }, onErr),
@@ -643,6 +644,14 @@ export function startApp({ net, doc, win, delays }) {
       '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div></section>';
   }
 
+  // Only the host can cancel; it deletes the room for everyone.
+  function cancelHtml() {
+    if (!isHost()) return '';
+    if (!ui.cancel) return '<button class="btn danger cancelg" data-act="cancel">Cancel game</button>';
+    return '<section class="card cancelc"><p><b>Cancel this game for everyone?</b> The room and everything in it is deleted. This can\'t be undone.</p>' +
+      '<div class="row"><button class="btn danger grow" data-act="cancel-yes">Yes, cancel game</button><button class="btn ghost grow" data-act="cancel-no">Keep playing</button></div></section>';
+  }
+
   function gameHtml() {
     if (!game) return '<p class="muted center">Dealing…</p>';
     const D = deck(), ord = order();
@@ -654,7 +663,7 @@ export function startApp({ net, doc, win, delays }) {
       if (ui.selKey !== k) { ui.selKey = k; ui.sel[2] = hereCard(); }
     }
     const h = '<section class="card act">' + actionHtml(D) + '</section>' + boardHtml(D);
-    return h + notesHtml(D) + turnsHtml(D) + floatHtml(D) + modalHtml(D);
+    return h + notesHtml(D) + turnsHtml(D) + cancelHtml() + floatHtml(D) + modalHtml(D);
   }
 
   function render() {
@@ -662,7 +671,8 @@ export function startApp({ net, doc, win, delays }) {
     pill.hidden = !roomCode;
     if (roomCode) pill.textContent = 'Room ' + roomCode;
     let h;
-    if (!roomCode || !meta) h = roomCode ? '<p class="muted center">Joining…</p>' : homeHtml();
+    if (roomCode && gone && !meta) h = '<section class="card"><h2>Game cancelled</h2><p>' + 'The host cancelled this game and deleted the room.</p><button class="btn" data-act="home">Back to start</button></section>';
+    else if (!roomCode || !meta) h = roomCode ? '<p class="muted center">Joining…</p>' : homeHtml();
     else if (!players[uid]) h = '<section class="card"><p>You are no longer in this room.</p><button class="btn" data-act="home">Back to start</button></section>';
     else if (meta.status === 'playing') h = gameHtml();
     else h = lobbyHtml();
@@ -712,6 +722,9 @@ export function startApp({ net, doc, win, delays }) {
       case 'helper': run(() => (isHost() ? net.set(room('meta/helper'), !meta.helper) : null)); break;
       case 'start': run(startGame); break;
       case 'again': run(backToLobby); break;
+      case 'cancel': ui.cancel = true; render(); break;
+      case 'cancel-no': ui.cancel = false; render(); break;
+      case 'cancel-yes': run(async () => { if (!isHost()) return; const code = roomCode; await net.remove('rooms/' + code); win.location.href = win.location.pathname; }); break;
       case 'home': win.location.href = win.location.pathname; break;
       case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
       case 'next': ui.seen++; render(); break;

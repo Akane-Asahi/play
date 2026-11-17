@@ -40,6 +40,7 @@ export class FakeDb {
     };
     const canWrite = (path, value) => {
       const [r, code, area, who, n] = path.split('/');
+      if (r === 'rooms' && code && !area) return value == null && host(code);   // the host may delete the whole room
       if (r !== 'rooms' || !area) return false;
       if (area === 'meta') return who === 'host' ? (db.read(path) == null ? value === uid : host(code)) : (host(code) || pendingHost === uid);
       if (area === 'players') return who === uid || host(code) || pendingHost === uid;

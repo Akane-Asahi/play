@@ -154,3 +154,6 @@ main{padding-bottom:150px}
 @media (prefers-reduced-motion:reduce){.iso .go{animation:none}}
 .lg em{font-style:normal;opacity:.6;font-size:11px}
 .rnote{text-align:center;font-size:15px;font-weight:600;color:var(--ink);margin:12px 0 0}
+.cancelg{margin:6px 0 14px}
+.cancelc{border-color:var(--bad)}
+.cancelc p{margin:0 0 4px}

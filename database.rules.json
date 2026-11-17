@@ -2,6 +2,7 @@
   "rules": {
     "rooms": {
       "$code": {
+        ".write": "auth != null && !newData.exists() && data.child('meta/host').val() === auth.uid",
         "meta": {
           ".read": "auth != null",
           "$field": {
