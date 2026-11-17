@@ -377,9 +377,8 @@ export function startApp({ net, doc, win, delays }) {
     let inner;
     if (g.phase === 'roll') {
       const to = B.PASSAGE[B.roomOf(g.pos[uid])];
-      inner = '<div class="row"><button class="btn grow" data-act="roll">Roll the dice</button>' +
-        (wasCalled() ? '<button class="btn ghost grow" data-act="stayin">Suggest here</button>' : '') +
-        (to != null ? '<button class="btn ghost grow" data-act="passage">Secret passage to the ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>';
+      inner = '<div class="row"><button class="btn grow" data-act="roll">Roll Dice</button>' +
+        (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>';
     } else if (g.phase === 'move') {
       inner = '<div class="fsum">Tap a glowing square or room on the board</div><div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>';
     } else if (g.phase === 'end' && !ui.accusing) {
@@ -497,7 +496,7 @@ export function startApp({ net, doc, win, delays }) {
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
       const dice = g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '';
-      if (g.phase === 'roll' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Suggest here, or roll the dice.</div></div>';
+      if (g.phase === 'roll' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Roll the dice.</div></div>';
       if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
       if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div>' + dice + '<div class="muted">You rolled ' + (g.dice[0] + g.dice[1]) + '. Tap where you want to go.</div></div>';
       if (full() && g.phase === 'suggest') return '<div class="ask"><div class="muted">You are in the</div><div class="who">' + esc(D.CARDS[hereCard()]) + '</div><div class="muted">Choose a suspect and a weapon in your notes</div></div>';
