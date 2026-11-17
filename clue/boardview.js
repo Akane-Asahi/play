@@ -11,12 +11,39 @@ const poly = (points, attrs) => '<polygon points="' + points + '" ' + attrs + '/
 const line = (a, b, attrs) => '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" ' + attrs + '/>';
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// A box standing on the floor: top, and the two faces turned to the viewer.
+function box(x, y, w, d, h, top, left, right, z0) {
+  const z = z0 || 0;
+  return poly(pts([P(x, y + d, z), P(x + w, y + d, z), P(x + w, y + d, z + h), P(x, y + d, z + h)]), 'fill="' + left + '"') +
+    poly(pts([P(x + w, y, z), P(x + w, y + d, z), P(x + w, y + d, z + h), P(x + w, y, z + h)]), 'fill="' + right + '"') +
+    poly(pts([P(x, y, z + h), P(x + w, y, z + h), P(x + w, y + d, z + h), P(x, y + d, z + h)]), 'fill="' + top + '"');
+}
+const flat = (x, y, w, d, fill, z) => poly(pts([P(x, y, z), P(x + w, y, z), P(x + w, y + d, z), P(x, y + d, z)]), 'fill="' + fill + '"');
+const dot = (x, y, z, r, fill) => { const c = P(x, y, z); return '<circle cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="' + r + '" fill="' + fill + '"/>'; };
+const WOOD = ['#8a6238', '#5d4022', '#734f2b'], DARK = ['#4a3a2e', '#2b2019', '#382a20'], STONE = ['#c2bcad', '#857f72', '#a09a8c'];
+const shelf = (x, y, w, d) => box(x, y, w, d, 13, '#6b4a2a', '#4b3119', '#5a3c20') +
+  (w > d ? line(P(x, y + d, 4.5), P(x + w, y + d, 4.5), 'stroke="#d8b06a" stroke-width="1.6" stroke-dasharray="3 1.5"') + line(P(x, y + d, 9), P(x + w, y + d, 9), 'stroke="#9fb3c8" stroke-width="1.6" stroke-dasharray="2 2"')
+    : line(P(x + w, y, 4.5), P(x + w, y + d, 4.5), 'stroke="#d8b06a" stroke-width="1.6" stroke-dasharray="3 1.5"') + line(P(x + w, y, 9), P(x + w, y + d, 9), 'stroke="#9fb3c8" stroke-width="1.6" stroke-dasharray="2 2"'));
+const plant = (x, y) => box(x, y, 0.4, 0.4, 4, '#8a5a3a', '#5f3b24', '#734830') + dot(x + 0.2, y + 0.2, 9, 5.5, '#3f8f4d') + dot(x + 0.28, y + 0.12, 12, 3.5, '#5fb46a');
+// Simple furniture for each room, drawn at the room's corner (x, y).
+const FURNITURE = [
+  (x, y) => box(x + 0.1, y + 0.1, 2.8, 0.6, 7, ...STONE) + box(x + 0.1, y + 1.0, 0.6, 1.1, 7, '#3a3a3e', '#1f1f22', '#2a2a2e') + dot(x + 0.4, y + 1.55, 7.5, 2.6, '#ff9a3c') + dot(x + 0.9, y + 0.4, 9, 2, '#d9d2c0') + dot(x + 1.8, y + 0.4, 9, 2, '#b55a3a'),
+  (x, y) => { let f = ''; for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) if ((a + b) % 2) f += flat(x + a, y + b, 1, 1, 'rgba(255,255,255,.13)'); return f + box(x + 0.2, y + 0.2, 1.1, 0.7, 8, '#26262b', '#0f0f12', '#18181c'); },
+  (x, y) => plant(x + 0.2, y + 0.2) + plant(x + 1.2, y + 0.15) + plant(x + 2.2, y + 0.2) + plant(x + 0.15, y + 1.3) + plant(x + 0.2, y + 2.4),
+  (x, y) => box(x + 0.8, y + 0.2, 2.3, 0.75, 6, ...WOOD) + dot(x + 1.4, y + 0.55, 8, 2, '#efe6cf') + dot(x + 2.0, y + 0.55, 8, 2, '#efe6cf') + dot(x + 2.6, y + 0.55, 8, 2, '#efe6cf'),
+  (x, y) => box(x + 0.25, y + 0.25, 1.7, 0.95, 6, '#2f7d54', '#5d4022', '#734f2b') + dot(x + 0.8, y + 0.7, 7, 1.6, '#f3ead4') + dot(x + 1.3, y + 0.6, 7, 1.6, '#c62828'),
+  (x, y) => shelf(x + 0.1, y + 0.05, 3.8, 0.4) + shelf(x + 0.05, y + 0.6, 0.4, 2.6),
+  (x, y) => flat(x + 1.0, y + 1.0, 2.2, 2.2, 'rgba(176,86,42,.55)') + box(x + 0.15, y + 0.9, 0.65, 1.9, 5, '#b0673a', '#6e3d20', '#874b28') + box(x + 0.15, y + 0.9, 0.2, 1.9, 4, '#c0744a', '#6e3d20', '#874b28', 5) + box(x + 1.2, y + 0.1, 1.2, 0.35, 9, ...STONE) + dot(x + 1.8, y + 0.5, 3, 4, '#ff8a2c'),
+  (x, y) => flat(x + 1.55, y + 0.3, 0.9, 3.4, 'rgba(150,40,40,.55)') + box(x + 0.2, y + 0.1, 0.4, 0.3, 15, ...WOOD) + dot(x + 0.4, y + 0.42, 11, 2.2, '#efe6cf'),
+  (x, y) => shelf(x + 0.05, y + 0.4, 0.4, 2.7) + box(x + 0.9, y + 0.3, 1.5, 0.75, 6, ...DARK) + dot(x + 1.2, y + 0.6, 9, 2.6, '#7fe08a') + flat(x + 1.7, y + 0.5, 0.4, 0.3, '#efe6cf', 6.2),
+];
+
 // Where a pawn stands, in grid units.
 function spot(v, seat) {
   const k = B.roomOf(v);
   if (k < 0) { const [x, y] = B.xy(v); return [x + 0.5, y + 0.5]; }
   const r = B.roomRect(k);
-  return [r.x + 0.8 + (seat % 3) * 1.2, r.y + (seat < 3 ? 0.85 : 3.2)];
+  return [r.x + 1.3 + (seat % 3) * 1.0, r.y + (seat < 3 ? 1.6 : 3.3)];
 }
 
 // o: { pos, order, me, turn, out:{pid}, roomNames:[9], go: { cells: Map, rooms: {} } | null }
@@ -52,6 +79,7 @@ export function boardSvg(o) {
     });
     s += '<polyline points="' + pts([P(x0, y0 + 4, WH), P(x0, y0, WH), P(x0 + 4, y0, WH)]) + '" fill="none" stroke="#9a9eab" stroke-width="1.2"/>';
     s += '<ellipse cx="' + P(x0 + 0.25, y0 + 0.25, WH + 5)[0] + '" cy="' + P(x0 + 0.25, y0 + 0.25, WH + 5)[1] + '" rx="2" ry="3.4" fill="#ffd87a"/>';
+    s += FURNITURE[k](x0, y0);
     // front edges, open where the doors are
     s += '<polyline points="' + pts([P(x0 + 4, y0), P(x0 + 4, y0 + 4), P(x0, y0 + 4)]) + '" fill="none" stroke="#211e1a" stroke-width="2.4"/>';
     B.DOORS.filter((d) => d.k === k).forEach((d) => {

@@ -16,6 +16,8 @@
 //   pos:  { pid: square | -(room + 1) }
 //   dice: [a, b]                     this turn's roll
 //   nosug: true                      this turn ended without a suggestion
+//   called: { pid: true }            moved into a room by someone's suggestion: may suggest there next turn
+//   Each player is the suspect of their seat (seat 0 = first suspect card, ...).
 // }
 
 import * as B from './board.js';
@@ -52,16 +54,29 @@ export const roomCardHere = (game, pid) => {
   const k = isFull(game) && game.pos ? B.roomOf(game.pos[pid]) : -1;
   return k < 0 ? null : game.rc0 + k;
 };
+const uncall = (game, pid) => {
+  if (!game.called || !game.called[pid]) return game;
+  const called = { ...game.called }; delete called[pid];
+  const next = { ...game, called };
+  if (!Object.keys(called).length) delete next.called;
+  return next;
+};
+// Called into this room by someone else's suggestion: suggest here without rolling.
+export function stayIn(game, pid) {
+  if (!isFull(game) || game.over || game.phase !== 'roll' || game.turn !== pid) return undefined;
+  if (!game.called || !game.called[pid] || B.roomOf(game.pos[pid]) < 0) return undefined;
+  return { ...uncall(game, pid), phase: 'suggest' };
+}
 export function roll(game, pid, dice) {
   if (!isFull(game) || game.over || game.phase !== 'roll' || game.turn !== pid) return undefined;
   if (!Array.isArray(dice) || dice.length !== 2 || !dice.every((d) => Number.isInteger(d) && d >= 1 && d <= 6)) return undefined;
-  return { ...game, phase: 'move', dice: dice.slice() };
+  return { ...uncall(game, pid), phase: 'move', dice: dice.slice() };
 }
 export function passage(game, pid) {
   if (!isFull(game) || game.over || game.phase !== 'roll' || game.turn !== pid) return undefined;
   const to = B.PASSAGE[B.roomOf(game.pos[pid])];
   if (to == null) return undefined;
-  return { ...game, phase: 'suggest', pos: { ...game.pos, [pid]: B.inRoom(to) } };
+  return { ...uncall(game, pid), phase: 'suggest', pos: { ...game.pos, [pid]: B.inRoom(to) } };
 }
 // dest: a corridor square, a room as -(k + 1), or 'stay'.
 export function move(game, pid, dest) {
@@ -98,7 +113,15 @@ export function suggest(game, by, cards, order) {
   if (isFull(game) && cards[2] !== roomCardHere(game, by)) return undefined;     // only the room you are in
   const ask = [];
   for (let k = 1; k < order.length; k++) ask.push(order[(i + k) % order.length]);
-  return { ...game, phase: 'answer', cur: { by, cards: cards.slice(), order: ask, i: 0, n: logOf(game).length } };
+  const next = { ...game, phase: 'answer', cur: { by, cards: cards.slice(), order: ask, i: 0, n: logOf(game).length } };
+  if (isFull(game)) {                                    // the suspect named is brought into the room
+    const who = order[cards[0]];
+    if (who && who !== by && game.pos[who] !== game.pos[by]) {
+      next.pos = { ...game.pos, [who]: game.pos[by] };
+      next.called = { ...(game.called || {}), [who]: true };
+    }
+  }
+  return next;
 }
 
 // Whoever is being asked right now (or null).

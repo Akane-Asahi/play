@@ -22,7 +22,7 @@ const click = (sel) => { const el = document.querySelector(sel); if (el) el.clic
   for (const b of ['Sir', 'Bebun', 'Dada']) { click('[data-act=bot][data-n=' + b + ']'); await wait(20); }
   if (step === 'lobby') return;
   click('[data-act=start]'); await wait(100);
-  if (step === 'board') { click('[data-act=roll]'); return; }
+  if (step === 'board') { if (!qs.get('noroll')) click('[data-act=roll]'); return; }
   if (step === 'turn' || step === 'players') {
     [0, 1].forEach((k) => click('tr.pk td[data-act=pick][data-k="' + k + '"]'));
     if (step === 'players') { click('.rd.y'); click('#players-btn'); const ps = document.querySelectorAll('[data-act=pexp]'); ps.forEach((b) => b.click()); }

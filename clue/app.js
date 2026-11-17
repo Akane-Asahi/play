@@ -195,6 +195,8 @@ export function startApp({ net, doc, win, delays }) {
   const die = () => 1 + Math.floor(Math.random() * 6);
   const doRoll = () => tx((g) => E.roll(g, uid, [die(), die()]));
   const doPassage = () => tx((g) => E.passage(g, uid));
+  const doStayIn = () => tx((g) => E.stayIn(g, uid));
+  const wasCalled = () => !!(game && game.called && game.called[uid]);
   const doMove = (d) => tx((g) => E.move(g, uid, d));
   async function doEndTurn() {
     const ord = order();
@@ -261,6 +263,7 @@ export function startApp({ net, doc, win, delays }) {
       if (g.phase === 'end') return tx((x) => E.endTurn(x, p, ord));
       if (g.phase === 'roll') {
         const here = B.roomOf(g.pos[p]);
+        if (g.called && g.called[p]) return tx((x) => E.stayIn(x, p));
         if (B.PASSAGE[here] != null && B.PASSAGE[here] === mv.suggest[2] - g.rc0) return tx((x) => E.passage(x, p));
         return tx((x) => E.roll(x, p, [die(), die()]));
       }
@@ -360,6 +363,7 @@ export function startApp({ net, doc, win, delays }) {
     if (g.phase === 'roll') {
       const to = B.PASSAGE[B.roomOf(g.pos[uid])];
       inner = '<div class="row"><button class="btn grow" data-act="roll">Roll the dice</button>' +
+        (wasCalled() ? '<button class="btn ghost grow" data-act="stayin">Suggest here</button>' : '') +
         (to != null ? '<button class="btn ghost grow" data-act="passage">Secret passage to the ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>';
     } else if (g.phase === 'move') {
       inner = '<div class="fsum">Tap a glowing square or room on the board</div><div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>';
@@ -498,6 +502,7 @@ export function startApp({ net, doc, win, delays }) {
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
       const dice = g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '';
+      if (g.phase === 'roll' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Suggest here, or roll the dice.</div></div>';
       if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
       if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div>' + dice + '<div class="muted">You rolled ' + (g.dice[0] + g.dice[1]) + '. Tap where you want to go.</div></div>';
       if (full() && g.phase === 'suggest') return '<div class="ask"><div class="muted">You are in the</div><div class="who">' + esc(D.CARDS[hereCard()]) + '</div><div class="muted">Choose a suspect and a weapon in your notes</div></div>';
@@ -626,7 +631,7 @@ export function startApp({ net, doc, win, delays }) {
     const go = g.phase === 'move' && g.turn === uid && g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null;
     const roomNames = Array.from({ length: B.ROOMS }, (_, k) => D.CARDS[g.rc0 + k]);
     return '<section class="card boardc">' + boardSvg({ pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go }) +
-      '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + '</span>').join('') + '</div></section>';
+      '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div></section>';
   }
 
   function gameHtml() {
@@ -684,6 +689,7 @@ export function startApp({ net, doc, win, delays }) {
       case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), el.dataset.m === 'full' ? 'full' : 'fast') : null)); break;
       case 'roll': run(doRoll); break;
       case 'passage': run(doPassage); break;
+      case 'stayin': run(doStayIn); break;
       case 'stay': run(() => doMove('stay')); break;
       case 'go': run(() => doMove(+el.getAttribute('data-d'))); break;
       case 'join': run(() => { const c = (ui.code || '').trim().toUpperCase(); if (!c) throw new Error('Type the room code first.'); return joinRoom(c); }); break;

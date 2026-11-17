@@ -55,6 +55,15 @@ const S = loadSolver();
   g = E.endTurn(E.move(E.roll(E.endTurn(g, 'b', order), 'c', [6, 6]), 'c', 'stay'), 'c', order);
   g = E.passage(g, 'a');
   assert(g.phase === 'suggest' && g.pos.a === B.inRoom(8), 'kitchen passage leads to the study');
+  // a named suspect's player is brought into the room and may suggest there next turn
+  g = E.suggest(g, 'a', [1, 6, 20], order);                 // suspect 1 is seat 1: player b
+  assert(g.pos.b === g.pos.a && g.called.b, 'b is moved into the study');
+  g = E.endTurn(E.answer(E.answer(g, 'b', 'none'), 'c', 'none'), 'a', order);
+  assert.equal(E.stayIn(g, 'a'), undefined);
+  const stay = E.stayIn(g, 'b');
+  assert(stay.phase === 'suggest' && !stay.called, 'called player suggests without rolling');
+  assert(!E.roll(g, 'b', [2, 2]).called, 'rolling gives the chance up');
+  assert(!E.suggest(stay, 'b', [0, 7, 20], order).called, 'no call when already in the room');
   // a pawn in a corridor blocks the square
   const r = B.reach({ a: B.idx(4, 0), b: B.idx(4, 1), c: B.idx(5, 0) }, 'a', 6);
   assert.equal(r.cells.size, 0, 'boxed in');
