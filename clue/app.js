@@ -527,7 +527,7 @@ export function startApp({ net, doc, win, delays }) {
     if (!meta.helper) return pickOnlyHtml(D);
     const others = order().filter((p) => p !== uid);
     const rd = (c, o, v, on) => '<button class="rd ' + v + (on ? ' on' : '') + '" role="radio" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + (v === 'y' ? 'Has it' : 'Does not have it') + '" data-act="mark" data-c="' + c + '" data-o="' + o + '" data-v="' + v + '">' + (v === 'y' ? TICK : CROSS) + '</button>';
-    let h = '<section class="card"><h2>Your notes</h2><div class="nscroll"><table class="nt manual"><thead><tr><th></th><th>Envelope</th>' +
+    let h = '<section class="card notes"><h2>Your notes</h2><div class="nscroll"><table class="nt manual"><thead><tr><th></th><th>Envelope</th>' +
       others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
     [0, 1, 2].forEach((k) => {
       h += '<tr class="cat"><td colspan="' + (2 + others.length) + '">' + S.CAT_PLURAL[k] + '</td></tr>';
@@ -546,7 +546,7 @@ export function startApp({ net, doc, win, delays }) {
 
   // With the notes sheet switched off there is still a list to choose cards from.
   function pickOnlyHtml(D) {
-    let h = '<section class="card"><h2>Cards</h2><table class="nt pickonly"><tbody>';
+    let h = '<section class="card notes"><h2>Cards</h2><table class="nt pickonly"><tbody>';
     [0, 1, 2].forEach((k) => {
       h += '<tr class="cat"><td>' + S.CAT_PLURAL[k] + '</td></tr>';
       for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) h += '<tr class="' + (myHand.includes(c) ? 'mine' : '') + selClass(c, k) + '">' + nameCell(D, c, k, myHand.includes(c)) + '</tr>';
@@ -558,15 +558,19 @@ export function startApp({ net, doc, win, delays }) {
     const r = helper();
     if (!r) return isTelot() ? '' : manualNotesHtml(D);
     const ord = order(), E_ = r.nP, others = ord.filter((p) => p !== uid);
-    let h = '<section class="card"><h2>Your notes</h2>';
-    if (r.solved) h += '<div class="banner solvedb"><b>Solved:</b> ' + r.envelope.map((l) => esc(D.CARDS[l[0].card])).join(' · ') + '</div>';
+    let located = 0;
+    for (let c = 0; c < D.N; c++) if (r.certain[c] != null && r.certain[c] >= 0) located++;
+    let h = '<div class="prog"><div class="tx">Located ' + located + ' out of ' + D.N + ' cards</div><div class="tr"><i style="width:' + Math.round(located / D.N * 100) + '%"></i></div></div>' +
+      '<section class="card sum"><div><div class="muted">' + (r.solved ? 'Envelope solved' : 'Best guess for the envelope') + '</div><b>' + r.envelope.map((l) => cardHtml(D, l[0].card)).join(' · ') + '</b></div>' +
+      '<span class="muted">' + r.envelope.map((l) => l.length).join(' · ') + ' left</span></section>';
+    h += '<section class="card notes"><h2>Your notes</h2>';
     h += '<table class="nt"><thead><tr><th></th><th>Envelope</th>' + others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
     [0, 1, 2].forEach((k) => {
       h += '<tr class="cat"><td colspan="' + (2 + others.length) + '">' + S.CAT_PLURAL[k] + '</td></tr>';
       for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
         const mine = myHand.includes(c), inEnv = r.certain[c] === E_, canEnv = r.possible[c][E_];
         const pct = inEnv ? '100%' : !canEnv ? '–' : r.prob ? Math.round(r.prob[c][E_] * 100) + '%' : '?';
-        h += '<tr class="' + (mine ? 'mine' : inEnv ? 'hit' : !canEnv ? 'elim' : '') + selClass(c, k) + '">' + nameCell(D, c, k, mine) + '<td class="pc">' + pct + '</td>' +
+        h += '<tr class="' + (mine ? 'mine' : inEnv ? 'hit' : !canEnv ? 'elim' : '') + selClass(c, k) + '">' + nameCell(D, c, k, mine) + '<td class="pc">' + pct + '<div class="bar"><i style="width:' + (inEnv ? 100 : !canEnv ? 0 : r.prob ? Math.round(r.prob[c][E_] * 100) : 0) + '%"></i></div></td>' +
           others.map((p) => { const o = ord.indexOf(p); return '<td class="' + (r.certain[c] === o ? 'y">✓' : !r.possible[c][o] ? 'n">✕' : 'q">?') + '</td>'; }).join('') + '</tr>';
       }
     });
@@ -679,6 +683,8 @@ export function startApp({ net, doc, win, delays }) {
     else if (meta.status === 'playing') h = gameHtml();
     else h = lobbyHtml();
     const inGame = !!(roomCode && meta && meta.status === 'playing' && players[uid] && game);
+    const ttl = doc.querySelector('header h1');
+    if (ttl) ttl.innerHTML = inGame && !game.over ? 'Turn ' + (E.logOf(game).length + 1) + ' <span class="tdot">•</span> <span class="tname">' + esc(nm(game.turn)) + '</span>' : 'Clues';
     const pb = $('players-btn');
     if (pb) pb.hidden = !inGame;
     $('view').innerHTML = h + (inGame ? playersPanel() : '');

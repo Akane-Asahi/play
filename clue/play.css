@@ -158,3 +158,45 @@ main{padding-bottom:150px}
 .cancelg{margin:6px 0 14px}
 .cancelc{border-color:var(--bad)}
 .cancelc p{margin:0 0 4px}
+
+/* ---- the Clues tracker look: cream notes sheet, summary strip, rounded dock ---- */
+header h1{max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header h1 .tname{border-bottom:0;cursor:default}
+.prog{padding:2px 4px 12px}
+.prog .tx{font-size:14px;margin-bottom:8px}
+.card.sum{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:0 0 14px;cursor:default}
+.card.sum b{font-size:14px}
+.card.act{padding:10px 14px}
+.card.act .ask{margin:0}
+.card.act .ask .who{font-size:24px;margin:2px 0}
+.card.notes{background:var(--cream);color:var(--cink);border:0;border-radius:28px 28px 0 0;margin:0 -14px 14px;padding:14px 12px 16px}
+.notes h2{color:var(--cmute);font-size:12px;letter-spacing:2px;font-weight:700;margin:6px 6px 6px}
+.notes .muted{color:var(--cmute)}
+.notes .nt{font-size:15px}
+.notes .nt th{color:var(--cmute);font-size:11px;letter-spacing:1px}
+.notes .nt td{border-top:1px solid var(--cline);padding:9px 4px}
+.notes .nt tr.cat td{border-top:0;color:var(--cmute);font-size:12px;letter-spacing:2px;font-weight:700;padding-top:16px}
+.notes .nt td:first-child{color:var(--cink);font-size:16px}
+.notes .nt .pc{color:var(--cred);font-weight:650}
+.notes .nt .bar{height:4px;border-radius:2px;background:var(--cline);overflow:hidden;margin:3px auto 0;width:34px}
+.notes .nt .bar i{display:block;height:100%;background:var(--cred)}
+.notes .nt .y{color:#2d7a4f}
+.notes .nt .n{color:var(--cmute);opacity:.5}
+.notes .nt .q{color:var(--cred);font-weight:800}
+.notes .nt tr.mine td:first-child,.notes .nt tr.elim td:first-child{opacity:1;color:var(--cmute);text-decoration:line-through}
+.notes .nt tr.mine td:first-child .muted{text-decoration:none}
+.notes .nt tr.hit td{background:var(--csel)}
+.notes .nt tr.sel td{background:var(--csel)}
+.notes .nt tr.pk td.pkc:active{background:var(--csel)}
+.notes .rd{border-color:#bfae8a;color:var(--cmute)}
+.notes .rd.y.on{background:#2d7a4f;border-color:#2d7a4f;color:#fff}
+.notes .rd.n.on{background:var(--cred);border-color:var(--cred);color:#fff}
+.notes>p.muted{margin:10px 6px 0}
+main:has(.float){padding-bottom:230px}
+.float{left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));width:calc(100% - 24px);max-width:696px;padding:16px;background:#262019;border:0;border-radius:28px;box-shadow:0 12px 40px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04);-webkit-backdrop-filter:none;backdrop-filter:none}
+.float .row{gap:8px}
+.float .row .btn.grow{margin-top:0}
+.float .btn{border-radius:999px;padding:15px 12px;font-size:16px;font-weight:700}
+.float .fsum{color:#c9bfae;margin:0 6px 12px;line-height:1.35}
+.float .fsum i{color:#a99c86}
+.notes .nt td:first-child .muted{display:inline-block;text-decoration:none;margin-left:4px;font-size:12px}
