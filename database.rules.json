@@ -1,0 +1,30 @@
+{
+  "rules": {
+    "rooms": {
+      "$code": {
+        "meta": {
+          ".read": "auth != null",
+          "$field": {
+            ".write": "auth != null && newData.parent().child('host').val() === auth.uid"
+          }
+        },
+        "players": {
+          ".read": "auth != null",
+          "$pid": {
+            ".write": "auth != null && ($pid === auth.uid || root.child('rooms/' + $code + '/meta/host').val() === auth.uid)"
+          }
+        },
+        "hands": {
+          "$pid": {
+            ".read": "auth != null && ($pid === auth.uid || root.child('rooms/' + $code + '/meta/host').val() === auth.uid)",
+            ".write": "auth != null && root.child('rooms/' + $code + '/meta/host').val() === auth.uid"
+          }
+        },
+        "secret": {
+          ".read": "auth != null && root.child('rooms/' + $code + '/meta/host').val() === auth.uid",
+          ".write": "auth != null && root.child('rooms/' + $code + '/meta/host').val() === auth.uid"
+        }
+      }
+    }
+  }
+}
