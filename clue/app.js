@@ -2,7 +2,7 @@
 // (see main.js for the Firebase version), so the same code runs in tests against a fake.
 import * as E from './engine.js';
 import * as B from './board.js';
-import { boardSvg, dieSvg, SEAT_COLORS, ROOM_ART } from './boardview.js';
+import { boardSvg, dieSvg, SEAT_COLORS } from './boardview.js';
 
 export function startApp({ net, doc, win, delays }) {
   const S = win.ClueSolver;
@@ -636,11 +636,7 @@ export function startApp({ net, doc, win, delays }) {
     if (!E.isFull(g) || !g.pos) return '';
     const go = g.phase === 'move' && g.turn === uid && g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null;
     const roomNames = Array.from({ length: B.ROOMS }, (_, k) => D.CARDS[g.rc0 + k]);
-    // A picture of the room whose turn it is stands in, when that room has art.
-    const hereK = B.roomOf(g.pos[g.turn]), hereName = hereK >= 0 ? roomNames[hereK] : '';
-    const art = hereName ? ROOM_ART[hereName.toLowerCase().replace(/[^a-z]/g, '')] : null;
-    const scene = art ? '<figure class="scene"><img src="' + art + '" alt="' + esc(hereName) + '" decoding="async"><figcaption>' + esc(nm(g.turn)) + ' is in the ' + esc(hereName) + '</figcaption></figure>' : '';
-    return '<section class="card boardc">' + boardSvg({ pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go }) + scene +
+    return '<section class="card boardc">' + boardSvg({ pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go }) +
       '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div></section>';
   }
 
