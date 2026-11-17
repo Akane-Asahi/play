@@ -2,67 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clues – multiplayer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17130f">
+<title>Clues – play together</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="play.css">
 </head>
 <body>
-<div class="app">
-  <header class="top">
-    <h1>Clues</h1>
-    <span id="code-pill" class="pill" hidden></span>
-  </header>
-
-  <section id="home" class="card">
-    <h2>Your name</h2>
-    <input id="name" maxlength="20" placeholder="e.g. Telot" autocomplete="nickname">
-
-    <h2>Start a room</h2>
-    <select id="edition">
-      <option value="clue-us">Clue (US)</option>
-      <option value="cluedo-uk">Cluedo (UK)</option>
-    </select>
-    <button id="create" class="btn">Create room</button>
-
-    <h2>Join a room</h2>
-    <p class="muted">Paste the code a friend sent, or open their link.</p>
-    <input id="code" maxlength="5" placeholder="Room code" autocapitalize="characters">
-    <button id="join" class="btn ghost">Join room</button>
-  </section>
-
-  <section id="lobby" class="card" hidden>
-    <h2>Lobby</h2>
-    <p class="muted">Share this link with friends:</p>
-    <div class="row">
-      <input id="share" readonly>
-      <button id="copy" class="btn ghost">Copy</button>
-    </div>
-
-    <h2>Players</h2>
-    <ul id="players" class="list"></ul>
-
-    <div id="host-tools" hidden>
-      <h2>Add bots</h2>
-      <div id="bots" class="row wrap"></div>
-      <p class="muted">Need at least 3 players to start. Up to 6.</p>
-      <button id="start" class="btn">Start game</button>
-    </div>
-    <p id="waiting" class="muted" hidden>Waiting for the host to start the game.</p>
-  </section>
-
-  <section id="game" class="card" hidden>
-    <h2 id="game-title">Game</h2>
-    <h3>Your cards</h3>
-    <ul id="my-cards" class="list"></ul>
-    <h3>Players</h3>
-    <ul id="game-players" class="list"></ul>
-    <p class="muted">Turns are the next step: the table log and suggestions will appear here.</p>
-  </section>
-
-  <p id="msg" class="muted" role="status"></p>
-</div>
-
+<header>
+  <span class="hside"></span>
+  <h1>Clues</h1>
+  <span class="hside"><span id="code-pill" class="pill" hidden></span></span>
+</header>
+<main>
+  <div id="view"><p class="muted center">Loading…</p></div>
+  <p id="msg" class="warn center" role="status"></p>
+</main>
+<script src="portraits.js"></script>
 <script src="solver.js"></script>
-<script type="module" src="app.js"></script>
+<script type="module" src="main.js"></script>
 </body>
 </html>

@@ -23,6 +23,19 @@
         "secret": {
           ".read": "auth != null && root.child('rooms/' + $code + '/meta/host').val() === auth.uid",
           ".write": "auth != null && root.child('rooms/' + $code + '/meta/host').val() === auth.uid"
+        },
+        "game": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms/' + $code + '/players/' + auth.uid).exists()"
+        },
+        "shown": {
+          ".write": "auth != null && root.child('rooms/' + $code + '/meta/host').val() === auth.uid",
+          "$viewer": {
+            ".read": "auth != null && ($viewer === auth.uid || ($viewer.beginsWith('bot-') && root.child('rooms/' + $code + '/meta/host').val() === auth.uid))",
+            "$n": {
+              ".write": "auth != null && root.child('rooms/' + $code + '/players/' + auth.uid).exists()"
+            }
+          }
         }
       }
     }

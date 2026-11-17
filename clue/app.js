@@ -1,258 +1,516 @@
-// Multiplayer room lobby + private deal for Clues. Data lives in Firebase Realtime Database.
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getDatabase, ref, get, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { firebaseConfig } from './firebase-config.js';
+// Multiplayer Clues: lobby, turns, bots and notes. All network access goes through `net`
+// (see main.js for the Firebase version), so the same code runs in tests against a fake.
+import * as E from './engine.js';
 
-const S = window.ClueSolver;
-const BOT_NAMES = ['Bebun', 'Shishu', 'Protibondhi', 'Sir', 'Dada', 'Bro'];
-const MIN_PLAYERS = 3, MAX_PLAYERS = 6;
-const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-const NAME_KEY = 'clues-play-name';
+export function startApp({ net, doc, win, delays }) {
+  const S = win.ClueSolver;
+  const D0 = { bot: 1100, none: 900, ...(delays || {}) };
+  const NAME_KEY = 'clues-play-name';
+  const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const SUS_COLORS = { scarlett: ['#c62828', '#ffffff'], mustard: ['#e1ad01', '#231a00'], white: ['#ffffff', '#222222', '#b9b4aa'],
+    green: ['#2e7d32', '#ffffff'], peacock: ['#1565c0', '#ffffff'], plum: ['#7b1fa2', '#ffffff'] };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+  const $ = (id) => doc.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const sleep = (ms) => new Promise((r) => win.setTimeout(r, ms));
+  const lsGet = (k) => { try { return win.localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { win.localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
 
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let uid = null, roomCode = null;
+  let meta = null, players = {}, game = null, myHand = null, myShown = null;
+  let unsubs = [];
+  let msg = '';
+  const ui = { sel: [null, null, null], accusing: false, confirm: false, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
+  let autoKey = null, hostBusy = false, hostDirty = false, helperKey = null, helperRes = null;
 
-let uid = null;
-let roomCode = null;
-let meta = null;
-let players = {};
-let myHand = null;
-let unsubs = [];
+  // ---------- helpers ----------
+  const room = (p) => 'rooms/' + roomCode + (p ? '/' + p : '');
+  const order = () => E.seatOrder(players);
+  const isHost = () => !!meta && meta.host === uid;
+  const edition = () => S.EDITIONS.find((e) => e.id === (meta && meta.edition)) || S.EDITIONS[0];
+  const deck = () => S.makeDeck(edition());
+  const nm = (pid) => (pid === uid ? 'You' : (players[pid] && players[pid].name) || 'Someone');
+  const nmFull = (pid) => (players[pid] && players[pid].name) || 'Someone';
+  const tx = (fn) => net.tx(room('game'), (g) => fn(g));
 
-const roomPath = (p) => `rooms/${roomCode}/${p}`;
+  function randomCode() {
+    const buf = new Uint32Array(5);
+    win.crypto.getRandomValues(buf);
+    let s = '';
+    for (let i = 0; i < 5; i++) s += CODE_CHARS[buf[i] % CODE_CHARS.length];
+    return s;
+  }
+  const shareUrl = () => win.location.origin + win.location.pathname + '?room=' + roomCode;
+  const nextSeat = (list) => { const s = Object.values(list).map((p) => p.seat); return s.length ? Math.max(...s) + 1 : 0; };
 
-function setMsg(text) { $('msg').textContent = text || ''; }
-
-function randomCode() {
-  let s = '';
-  const buf = new Uint32Array(5);
-  crypto.getRandomValues(buf);
-  for (let i = 0; i < 5; i++) s += CODE_CHARS[buf[i] % CODE_CHARS.length];
-  return s;
-}
-
-function shareUrl(code) {
-  return `${location.origin}${location.pathname}?room=${code}`;
-}
-
-function nextSeat(list) {
-  const seats = Object.values(list).map((p) => p.seat);
-  return seats.length ? Math.max(...seats) + 1 : 0;
-}
-
-function showSection(id) {
-  for (const s of ['home', 'lobby', 'game']) $(s).hidden = s !== id;
-  $('code-pill').hidden = !roomCode;
-  if (roomCode) $('code-pill').textContent = `Room ${roomCode}`;
-}
-
-async function signIn() {
-  if (auth.currentUser) return auth.currentUser;
-  const cred = await signInAnonymously(auth);
-  return cred.user;
-}
-
-function getName() {
-  const name = $('name').value.trim();
-  if (!name) throw new Error('Type your name first.');
-  localStorage.setItem(NAME_KEY, name);
-  return name;
-}
-
-async function createRoom() {
-  const name = getName();
-  const user = await signIn();
-  uid = user.uid;
-
-  let code = randomCode();
-  for (let tries = 0; tries < 5; tries++) {
-    const taken = (await get(ref(db, `rooms/${code}/meta`))).exists();
-    if (!taken) break;
-    code = randomCode();
+  // ---------- card drawing (same look as the Clues tracker) ----------
+  function susKey(D, c) {
+    if (D.catOf(c) !== 0) return null;
+    return D.CARDS[c].toLowerCase().replace(/^(miss|mrs\.?|mr\.?|colonel|professor|prof\.?)\s+/, '').trim();
+  }
+  function portrait(D, c) {
+    const P = win.CLUE_PORTRAITS;
+    if (!P) return null;
+    let key = susKey(D, c);
+    if (!key) {
+      key = D.CARDS[c].toLowerCase().replace(/[^a-z]/g, '');
+      key = { dagger: 'knife', spanner: 'wrench', leadpiping: 'leadpipe', billiard: 'billiardroom', dining: 'diningroom' }[key] || key;
+    }
+    return P[key] || null;
+  }
+  function cardHtml(D, c) {
+    const name = D.CARDS[c];
+    const col = SUS_COLORS[susKey(D, c)];
+    if (D.catOf(c) !== 0 || !col) return esc(name);
+    return '<span class="sp" style="background:' + col[0] + ';color:' + col[1] + (col[2] ? ';border-color:' + col[2] : '') + '">' + esc(name) + '</span>';
+  }
+  function chip(D, c, cls, attrs) {
+    const col = SUS_COLORS[susKey(D, c)];
+    const style = col ? ' style="background:' + col[0] + ';color:' + col[1] + (col[2] ? ';border:1px solid ' + col[2] : '') + '"' : '';
+    return '<span class="chip' + (col ? ' sus' : '') + (cls || '') + '"' + style + (attrs || '') + '>' + esc(D.CARDS[c]) + '</span>';
+  }
+  // The three-card fan. opts: tap(c) -> can be tapped, dead(c) -> greyed out, seen(c) -> eye, hint
+  function fan(D, cards, opts) {
+    opts = opts || {};
+    return '<div class="fan">' + cards.map((c, i) => {
+      const tap = opts.tap && opts.tap(c), live = !(opts.dead && opts.dead(c)), src = portrait(D, c);
+      return '<div class="fc k' + i + (live ? ' live' : '') + (tap ? ' tap' : '') + (src ? ' art' : '') + '"' + (tap ? ' data-act="show" data-c="' + c + '"' : '') + '><div class="in">' +
+        (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
+        '<small>' + S.CAT_NAMES[i] + '</small>' +
+        (opts.seen && opts.seen(c) ? '<span class="seen" title="You showed them this card before">👁️</span>' : '') +
+        '<b' + (D.CARDS[c].length > 10 ? ' class="long"' : '') + '>' + esc(D.CARDS[c]) + '</b>' + (tap && opts.hint ? '<i>' + esc(opts.hint) + '</i>' : '') + '</div></div>';
+    }).join('') + '</div>';
   }
 
-  await update(ref(db, `rooms/${code}`), {
-    'meta/host': uid,
-    'meta/edition': $('edition').value,
-    'meta/status': 'lobby',
-    'meta/createdAt': Date.now(),
-    [`players/${uid}`]: { name, seat: 0, bot: false },
+  // ---------- rooms ----------
+  function needName() {
+    const name = (ui.name || '').trim().slice(0, 20);
+    if (!name) throw new Error('Type your name first.');
+    lsSet(NAME_KEY, name);
+    return name;
+  }
+
+  async function createRoom() {
+    const name = needName();
+    uid = await net.signIn();
+    let code = randomCode();
+    for (let i = 0; i < 5 && (await net.get('rooms/' + code + '/meta')); i++) code = randomCode();
+    await net.update('rooms/' + code, {
+      'meta/host': uid, 'meta/edition': ui.edition, 'meta/status': 'lobby', 'meta/helper': true, 'meta/createdAt': Date.now(),
+      ['players/' + uid]: { name, seat: 0, bot: false },
+    });
+    enterRoom(code);
+  }
+
+  async function joinRoom(code) {
+    const name = needName();
+    uid = await net.signIn();
+    const m = await net.get('rooms/' + code + '/meta');
+    if (!m) throw new Error('No room with that code.');
+    const list = (await net.get('rooms/' + code + '/players')) || {};
+    if (!list[uid]) {
+      if (m.status !== 'lobby') throw new Error('That game has already started.');
+      if (Object.keys(list).length >= E.MAX_PLAYERS) throw new Error('That room is full.');
+      await net.set('rooms/' + code + '/players/' + uid, { name, seat: nextSeat(list), bot: false });
+    }
+    enterRoom(code);
+  }
+
+  function enterRoom(code) {
+    roomCode = code;
+    try {
+      const url = new win.URL(win.location.href);
+      url.searchParams.set('room', code);
+      win.history.replaceState(null, '', url);
+    } catch (e) { /* not fatal */ }
+    unsubs.forEach((u) => u());
+    const onErr = (err) => { msg = 'Connection problem: ' + (err && err.message ? err.message : err); render(); };
+    unsubs = [
+      net.on(room('meta'), (v) => { meta = v; render(); }, onErr),
+      net.on(room('players'), (v) => { players = v || {}; render(); }, onErr),
+      net.on(room('game'), (v) => { game = v; render(); }, onErr),
+      net.on(room('hands/' + uid), (v) => { myHand = v; render(); }, onErr),
+      net.on(room('shown/' + uid), (v) => { myShown = v; render(); }, onErr),
+    ];
+  }
+
+  async function addBot(name) {
+    if (!isHost() || Object.keys(players).length >= E.MAX_PLAYERS) return;
+    await net.set(room('players/bot-' + name.toLowerCase()), { name, seat: nextSeat(players), bot: true });
+  }
+  async function removePlayer(pid) {
+    if (!isHost() || pid === uid) return;
+    await net.remove(room('players/' + pid));
+  }
+
+  // Host only: pick the envelope, shuffle the rest and write each hand privately.
+  async function startGame() {
+    if (!isHost()) return;
+    const ord = order();
+    if (ord.length < E.MIN_PLAYERS) throw new Error('Need at least ' + E.MIN_PLAYERS + ' players.');
+    const D = deck();
+    const seed = win.crypto.getRandomValues(new Uint32Array(1))[0];
+    const sizes = S.defaultHands(ord.length, D.N - 3);
+    const { envelope, hands } = E.deal(D, ord, sizes, S.mulberry32(seed));
+    const up = { 'meta/status': 'playing', 'meta/startedAt': Date.now(), 'secret/envelope': envelope, game: E.newGame(ord), shown: null };
+    ord.forEach((pid, i) => { up['hands/' + pid] = hands[pid]; up['players/' + pid + '/handSize'] = sizes[i]; });
+    await net.update(room(), up);
+  }
+
+  async function backToLobby() {
+    if (!isHost()) return;
+    const up = { 'meta/status': 'lobby', game: null, secret: null, shown: null };
+    order().forEach((pid) => { up['hands/' + pid] = null; up['players/' + pid + '/handSize'] = null; });
+    await net.update(room(), up);
+  }
+
+  // ---------- my moves ----------
+  function resetPick() { ui.sel = [null, null, null]; ui.accusing = false; ui.confirm = false; }
+
+  async function doSuggest() {
+    if (!ui.sel.every((c) => c != null)) return;
+    const cards = ui.sel.slice(), ord = order();
+    resetPick();
+    await tx((g) => E.suggest(g, uid, cards, ord));
+  }
+  async function doAccuse() {
+    if (!ui.sel.every((c) => c != null)) return;
+    const cards = ui.sel.slice();
+    resetPick();
+    await tx((g) => E.accuse(g, uid, cards));
+  }
+  async function doEndTurn() {
+    const ord = order();
+    resetPick();
+    await tx((g) => E.endTurn(g, uid, ord));
+  }
+  async function showCard(c) {
+    const cur = game && game.cur;
+    if (!cur || E.asked(game) !== uid || !myHand || !myHand.includes(c) || !cur.cards.includes(c)) return;
+    await net.update(room(), {
+      ['shown/' + cur.by + '/' + cur.n]: { card: c, from: uid },
+      ['shown/' + uid + '/' + cur.n]: { card: c, to: cur.by },
+    });
+    await tx((g) => E.answer(g, uid, 'showed'));
+  }
+  // When I'm asked and hold none of the cards, say so without a tap.
+  function autoNone() {
+    if (!game || game.over || E.asked(game) !== uid || !myHand) { return; }
+    const cur = game.cur;
+    if (cur.cards.some((c) => myHand.includes(c))) return;
+    const key = cur.n + ':' + cur.i;
+    if (autoKey === key) return;
+    autoKey = key;
+    win.setTimeout(() => { run(() => tx((g) => (g && g.cur && g.cur.n === cur.n && g.cur.i === cur.i ? E.answer(g, uid, 'none') : undefined))); }, D0.none);
+  }
+
+  // ---------- host duties: bots and checking accusations ----------
+  async function hostStep() {
+    const g = game, ord = order();
+    if (!g || g.over || !meta || meta.status !== 'playing') return false;
+    const isBot = (p) => !!(players[p] && players[p].bot);
+    if (g.phase === 'accusing') {
+      const env = await net.get(room('secret/envelope'));
+      if (!env) return false;
+      return tx((x) => E.resolveAccuse(x, env, ord));
+    }
+    if (g.phase === 'answer') {
+      const p = E.asked(g), cur = g.cur;
+      if (!isBot(p)) return false;
+      await sleep(D0.bot);
+      const hand = (await net.get(room('hands/' + p))) || [];
+      const held = cur.cards.filter((c) => hand.includes(c));
+      const same = (x) => (x && x.cur && x.cur.n === cur.n && x.cur.i === cur.i);
+      if (!held.length) return tx((x) => (same(x) ? E.answer(x, p, 'none') : undefined));
+      const card = E.pickShow(held, E.shownTo(await net.get(room('shown/' + p)), cur.by));
+      await net.update(room(), {
+        ['shown/' + p + '/' + cur.n]: { card, to: cur.by },
+        ['shown/' + cur.by + '/' + cur.n]: { card, from: p },
+      });
+      return tx((x) => (same(x) ? E.answer(x, p, 'showed') : undefined));
+    }
+    if ((g.phase === 'suggest' || g.phase === 'end') && isBot(g.turn)) {
+      const p = g.turn;
+      await sleep(D0.bot);
+      const hand = (await net.get(room('hands/' + p))) || [];
+      const shown = await net.get(room('shown/' + p));
+      const mv = E.botThink(S, E.solverState(edition(), players, ord, p, hand, g, shown), Math.random);
+      if (mv.accuse) return tx((x) => E.accuse(x, p, mv.accuse));
+      if (g.phase === 'end') return tx((x) => E.endTurn(x, p, ord));
+      return tx((x) => E.suggest(x, p, mv.suggest, ord));
+    }
+    return false;
+  }
+  async function hostTick() {
+    if (!isHost()) return;
+    if (hostBusy) { hostDirty = true; return; }   // something changed while a bot was thinking: look again after
+    hostBusy = true; hostDirty = false;
+    let acted = false;
+    try { acted = await hostStep(); } catch (e) { msg = e.message || String(e); }
+    hostBusy = false;
+    if (acted || hostDirty) win.setTimeout(hostTick, 30);
+  }
+
+  // ---------- my notes (the deduction helper) ----------
+  function helper() {
+    if (!meta || !meta.helper || !game || !myHand || !players[uid] || players[uid].handSize == null) return null;
+    const key = E.logOf(game).length + '|' + JSON.stringify(myShown || {}) + '|' + myHand.join(',');
+    if (key !== helperKey) {
+      helperKey = key;
+      try { helperRes = S.analyse(E.solverState(edition(), players, order(), uid, myHand, game, myShown)); } catch (e) { helperRes = null; }
+    }
+    return helperRes && helperRes.ok ? helperRes : null;
+  }
+
+  // ---------- screens ----------
+  function homeHtml() {
+    return '<section class="card"><h2>Your name</h2><input type="text" id="name" maxlength="20" placeholder="e.g. Telot" autocomplete="nickname" value="' + esc(ui.name) + '"></section>' +
+      '<section class="card"><h2>Start a room</h2><select id="edition">' +
+      S.EDITIONS.map((e) => '<option value="' + esc(e.id) + '"' + (e.id === ui.edition ? ' selected' : '') + '>' + esc(e.name) + '</option>').join('') +
+      '</select><button class="btn" data-act="create">Create room</button></section>' +
+      '<section class="card"><h2>Join a room</h2><p class="muted">Type the code a friend sent you, or open their link.</p>' +
+      '<input type="text" id="code" maxlength="5" placeholder="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
+      '<button class="btn ghost" data-act="join">Join room</button></section>';
+  }
+
+  function lobbyHtml() {
+    const ord = order(), host = isHost(), full = ord.length >= E.MAX_PLAYERS;
+    let h = '<section class="card"><h2>Invite friends</h2><p class="muted">Share this link. Anyone who opens it can join.</p>' +
+      '<div class="row"><input type="text" class="grow" id="share" readonly value="' + esc(shareUrl()) + '"><button class="btn ghost fit" data-act="copy">Copy</button></div></section>';
+    h += '<section class="card"><h2>Players (' + ord.length + ' of up to ' + E.MAX_PLAYERS + ')</h2><div class="plist">';
+    ord.forEach((pid) => {
+      const p = players[pid];
+      h += '<div class="pl"><span class="pn">' + esc(p.name) + '</span><span class="muted grow">' +
+        [pid === meta.host ? 'host' : '', p.bot ? 'bot' : '', pid === uid ? 'you' : ''].filter(Boolean).join(' · ') + '</span>' +
+        (host && pid !== uid ? '<button class="btn ghost fit mini" data-act="kick" data-p="' + esc(pid) + '">Remove</button>' : '') + '</div>';
+    });
+    h += '</div></section>';
+    if (host) {
+      const taken = new Set(Object.values(players).map((p) => p.name));
+      const free = E.BOT_NAMES.filter((n) => !taken.has(n));
+      h += '<section class="card"><h2>Add bots</h2><div class="chips">' +
+        (free.length ? free.map((n) => '<span class="chip' + (full ? ' off' : '') + '" data-act="bot" data-n="' + esc(n) + '">+ ' + esc(n) + '</span>').join('') : '<span class="muted">All six bots are in.</span>') +
+        '</div><p class="muted">Bots play on your device, so keep this page open during the game.</p></section>';
+      h += '<section class="card"><div class="switch"><div><b>Notes for everyone</b><div class="muted">Each player gets a notes table that works out what they can know from their own cards and the turns.</div></div>' +
+        '<button class="tog' + (meta.helper ? ' on' : '') + '" data-act="helper" aria-label="Toggle notes"></button></div></section>';
+      h += '<button class="btn" data-act="start"' + (ord.length < E.MIN_PLAYERS ? ' disabled' : '') + '>Start game</button>' +
+        (ord.length < E.MIN_PLAYERS ? '<p class="muted center">You need at least ' + E.MIN_PLAYERS + ' players. Add a bot or invite a friend.</p>' : '');
+    } else {
+      h += '<p class="muted center">Waiting for ' + esc(nmFull(meta.host)) + ' to start the game.</p>';
+    }
+    return h;
+  }
+
+  function pickerHtml(D, accuseOnly) {
+    let h = '';
+    [0, 1, 2].forEach((k) => {
+      h += '<div class="muted" style="margin:10px 0 4px">' + S.CAT_PLURAL[k] + '</div><div class="chips">';
+      for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) h += chip(D, c, ui.sel[k] === c ? ' on' : '', ' data-act="pick" data-k="' + k + '" data-c="' + c + '"');
+      h += '</div>';
+    });
+    const ready = ui.sel.every((c) => c != null);
+    if (ui.confirm && ready) {
+      h += '<div class="banner warnb"><b>Accuse ' + esc(D.CARDS[ui.sel[0]]) + ' with the ' + esc(D.CARDS[ui.sel[1]]) + ' in the ' + esc(D.CARDS[ui.sel[2]]) + '?</b><br>If you are wrong, you are out of the game.</div>' +
+        '<div class="row"><button class="btn danger grow" data-act="accuse-yes">Yes, accuse</button><button class="btn ghost grow" data-act="accuse-no">Cancel</button></div>';
+    } else if (accuseOnly) {
+      h += '<div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">Back</button></div>';
+    } else {
+      h += '<div class="row"><button class="btn grow" data-act="suggest"' + (ready ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>' +
+        '<p class="muted center">Pick one suspect, one weapon and one room.</p>';
+    }
+    return h;
+  }
+
+  function respPills(cur) {
+    const resp = cur.resp || [];
+    return '<div class="pills">' + cur.order.map((p, i) => {
+      const r = resp[i];
+      return '<span class="pill' + (i === cur.i ? ' on' : '') + (r ? ' done' : '') + '">' + esc(nm(p)) + (r ? ' · ' + (r.r === 'none' ? 'has none' : 'showed') : '') + '</span>';
+    }).join('') + '</div>';
+  }
+
+  function lastResultHtml(D, mine) {
+    const log = E.logOf(game), n = log.length - 1, e = log[n];
+    if (!e || e.t !== 's') return '';
+    const shower = (e.resp || []).find((r) => r.r === 'showed');
+    const cards = e.cards.map((c) => D.CARDS[c]).join(', ');
+    if (!shower) return '<div class="banner"><b>Nobody had any of these.</b><br>' + esc(cards) + '</div>';
+    if (mine) {
+      const sh = myShown && myShown[n];
+      return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed you ' + (sh && sh.card != null ? esc(D.CARDS[sh.card]) : 'a card') + '.</b><br>You asked for ' + esc(cards) + '.</div>';
+    }
+    return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.</b><br>' + esc(cards) + '</div>';
+  }
+
+  function actionHtml(D) {
+    const g = game, me = uid;
+    if (g.over) {
+      const w = g.over.winner;
+      let h = '<div class="ask"><div class="muted">' + (g.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div><div class="who">' + (w === me ? 'You win!' : esc(nmFull(w)) + ' wins') + '</div><div class="muted">The envelope held</div></div>';
+      h += fan(D, g.over.envelope.slice().sort((a, b) => a - b));
+      if (isHost()) h += '<button class="btn" data-act="again">Back to the lobby for a new game</button>';
+      else h += '<p class="muted center">' + esc(nmFull(meta.host)) + ' can start a new game.</p>';
+      return h;
+    }
+    if (g.phase === 'answer' && g.cur) {
+      const cur = g.cur, who = E.asked(g), iAsk = cur.by === me, meAsked = who === me;
+      let h = respPills(cur) + '<div class="ask"><div class="muted">' + (iAsk ? 'You\'re asking' : esc(nm(cur.by)) + ' is asking') + '</div><div class="who">' + esc(nm(who)) + '</div><div class="muted">';
+      if (meAsked) {
+        const held = myHand ? cur.cards.filter((c) => myHand.includes(c)) : [];
+        const before = E.shownTo(myShown, cur.by);
+        h += (held.length ? 'Pick the card you show' : 'You have none of these') + '</div></div>';
+        h += fan(D, cur.cards, { tap: (c) => held.includes(c), dead: (c) => !held.includes(c), seen: (c) => held.includes(c) && before.includes(c), hint: 'Tap to show' });
+        h += '<p class="muted center">' + (held.length ? 'Only ' + esc(nm(cur.by)) + ' sees the card you tap. 👁️ marks a card you already showed them.' : 'Passing to the next player…') + '</p>';
+      } else {
+        h += 'if they have any of these</div></div>' + fan(D, cur.cards);
+        h += '<p class="muted center">' + (iAsk ? 'If ' + esc(nm(who)) + ' has one, you will see it.' : 'You won\'t see which card is shown.') + '</p>';
+      }
+      return h;
+    }
+    if (g.phase === 'accusing' && g.acc) {
+      return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">' + (g.acc.by === me ? 'You accuse' : 'accuses') + '</div></div>' +
+        fan(D, g.acc.cards) + '<p class="muted center">Checking the envelope…</p>';
+    }
+    if (g.turn === me) {
+      if (g.phase === 'end' && !ui.accusing) {
+        return lastResultHtml(D, true) + '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Make an accusation</button></div>';
+      }
+      return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>' + pickerHtml(D, g.phase === 'end');
+    }
+    let h = g.phase === 'end' ? lastResultHtml(D, false) : '';
+    h += '<div class="ask"><div class="muted">' + (g.phase === 'end' ? 'Waiting for' : 'Turn') + '</div><div class="who">' + esc(nmFull(g.turn)) + '</div><div class="muted">' +
+      (g.phase === 'end' ? 'to end their turn' : 'is choosing a suggestion') + '</div></div>';
+    if (E.isOut(g, me)) h += '<p class="muted center">Your accusation was wrong, so you are out. You still show cards when asked.</p>';
+    return h;
+  }
+
+  function notesHtml(D) {
+    const r = helper();
+    if (!r) return '';
+    const ord = order(), E_ = r.nP, others = ord.filter((p) => p !== uid);
+    let h = '<section class="card"><h2>Your notes</h2>';
+    if (r.solved) h += '<div class="banner solvedb"><b>Solved:</b> ' + r.envelope.map((l) => esc(D.CARDS[l[0].card])).join(' · ') + '</div>';
+    h += '<table class="nt"><thead><tr><th></th><th>Envelope</th>' + others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
+    [0, 1, 2].forEach((k) => {
+      h += '<tr class="cat"><td colspan="' + (2 + others.length) + '">' + S.CAT_PLURAL[k] + '</td></tr>';
+      for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
+        const mine = myHand.includes(c), inEnv = r.certain[c] === E_, canEnv = r.possible[c][E_];
+        const pct = inEnv ? '100%' : !canEnv ? '–' : r.prob ? Math.round(r.prob[c][E_] * 100) + '%' : '?';
+        h += '<tr class="' + (mine ? 'mine' : inEnv ? 'hit' : !canEnv ? 'elim' : '') + '"><td>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') + '</td><td class="pc">' + pct + '</td>' +
+          others.map((p) => { const o = ord.indexOf(p); return '<td class="' + (r.certain[c] === o ? 'y">✓' : !r.possible[c][o] ? 'n">✕' : 'q">?') + '</td>'; }).join('') + '</tr>';
+      }
+    });
+    return h + '</tbody></table><p class="muted">Envelope shows the chance each card is the answer. ✓ they hold it, ✕ they can\'t, ? unknown.</p></section>';
+  }
+
+  function turnsHtml(D) {
+    const log = E.logOf(game);
+    if (!log.length) return '<section class="card"><h2>Turns</h2><p class="muted">No turns yet.</p></section>';
+    const tag = (p) => '<span class="pn">' + esc(nm(p).slice(0, 7)) + '</span>';
+    let t = '<section class="card"><h2>Turns</h2><table class="tt"><thead><tr><th>#</th><th>By</th><th>Suspect</th><th>Weapon</th><th>Room</th><th>Showed</th></tr></thead><tbody>';
+    for (let n = log.length - 1; n >= 0; n--) {
+      const e = log[n], sh = myShown && myShown[n];
+      const cell = (c) => '<td>' + cardHtml(D, c) + (e.t === 's' && sh && sh.card === c ? '&nbsp;👁️' : '') + '</td>';
+      let ans, note = '';
+      if (e.t === 'a') ans = '<span class="muted">Accused: ' + (e.ok ? 'right' : 'wrong') + '</span>';
+      else {
+        const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed');
+        ans = shower ? tag(shower.p) : '<span class="muted">Nobody</span>';
+        const none = resp.filter((r) => r.r === 'none').map((r) => esc(nm(r.p)));
+        if (none.length) note = 'Passed: ' + none.join(', ');
+      }
+      t += '<tr class="r"><td class="n">' + (n + 1) + '</td><td>' + tag(e.by) + '</td>' + cell(e.cards[0]) + cell(e.cards[1]) + cell(e.cards[2]) + '<td>' + ans + '</td></tr>';
+      if (note) t += '<tr class="nt"><td></td><td colspan="5"><div class="evsub">' + note + '</div></td></tr>';
+    }
+    return t + '</tbody></table><p class="muted">👁️ marks a card you saw or showed.</p></section>';
+  }
+
+  function gameHtml() {
+    if (!game) return '<p class="muted center">Dealing…</p>';
+    const D = deck(), ord = order();
+    let h = '<section class="card act">' + actionHtml(D) + '</section>';
+    h += '<section class="card"><h2>Your cards</h2><div class="chips">' +
+      (myHand && myHand.length ? myHand.map((c) => chip(D, c, ' still')).join('') : '<span class="muted">Dealing…</span>') + '</div></section>';
+    h += '<section class="card"><h2>Players</h2><div class="plist">' + ord.map((p) =>
+      '<div class="pl' + (game.turn === p && !game.over ? ' turn' : '') + '"><span class="pn">' + esc(nmFull(p)) + '</span><span class="muted grow">' +
+      [p === uid ? 'you' : '', players[p].bot ? 'bot' : '', (players[p].handSize != null ? players[p].handSize : '?') + ' cards', E.isOut(game, p) ? 'out' : '', game.turn === p && !game.over ? (p === uid ? 'your turn' : 'their turn') : ''].filter(Boolean).join(' · ') + '</span></div>').join('') + '</div></section>';
+    return h + notesHtml(D) + turnsHtml(D);
+  }
+
+  function render() {
+    const pill = $('code-pill');
+    pill.hidden = !roomCode;
+    if (roomCode) pill.textContent = 'Room ' + roomCode;
+    let h;
+    if (!roomCode || !meta) h = roomCode ? '<p class="muted center">Joining…</p>' : homeHtml();
+    else if (!players[uid]) h = '<section class="card"><p>You are no longer in this room.</p><button class="btn" data-act="home">Back to start</button></section>';
+    else if (meta.status === 'playing') h = gameHtml();
+    else h = lobbyHtml();
+    $('view').innerHTML = h;
+    $('msg').textContent = msg;
+    if (roomCode && meta && meta.status === 'playing') { autoNone(); hostTick(); }
+  }
+
+  // ---------- events ----------
+  async function run(fn) {
+    try { msg = ''; await fn(); } catch (err) { msg = (err && err.message) || String(err); }
+    render();
+  }
+
+  doc.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.id === 'name') ui.name = t.value;
+    else if (t.id === 'code') ui.code = t.value.toUpperCase();
+    else if (t.id === 'edition') ui.edition = t.value;
   });
-  enterRoom(code);
-}
+  doc.addEventListener('change', (e) => { if (e.target.id === 'edition') ui.edition = e.target.value; });
 
-async function joinRoom(code) {
-  const name = getName();
-  const user = await signIn();
-  uid = user.uid;
-
-  const m = (await get(ref(db, `rooms/${code}/meta`))).val();
-  if (!m) throw new Error('No room with that code.');
-
-  const list = (await get(ref(db, `rooms/${code}/players`))).val() || {};
-  if (!list[uid]) {
-    if (m.status !== 'lobby') throw new Error('That game has already started.');
-    if (Object.keys(list).length >= MAX_PLAYERS) throw new Error('That room is full.');
-    await set(ref(db, `rooms/${code}/players/${uid}`), { name, seat: nextSeat(list), bot: false });
-  }
-  enterRoom(code);
-}
-
-function enterRoom(code) {
-  roomCode = code;
-  const url = new URL(location.href);
-  url.searchParams.set('room', code);
-  history.replaceState(null, '', url);
-  unsubs.forEach((u) => u());
-  unsubs = [
-    onValue(ref(db, `rooms/${code}/meta`), (snap) => { meta = snap.val(); render(); }, onErr),
-    onValue(ref(db, `rooms/${code}/players`), (snap) => { players = snap.val() || {}; render(); }, onErr),
-    onValue(ref(db, `rooms/${code}/hands/${uid}`), (snap) => { myHand = snap.val(); render(); }, onErr),
-  ];
-}
-
-function onErr(err) {
-  setMsg(`Connection problem: ${err.message}`);
-}
-
-function isHost() {
-  return meta && meta.host === uid;
-}
-
-function render() {
-  if (!roomCode) return;
-  if (!meta) {
-    showSection('home');
-    return;
-  }
-  if (meta.status === 'playing') renderGame();
-  else renderLobby();
-}
-
-function renderLobby() {
-  showSection('lobby');
-  $('share').value = shareUrl(roomCode);
-
-  const sorted = Object.entries(players).sort((a, b) => a[1].seat - b[1].seat);
-  $('players').innerHTML = sorted.map(([pid, p]) =>
-    `<li>${esc(p.name)}${pid === meta.host ? ' <span class="muted">(host)</span>' : ''}${p.bot ? ' <span class="muted">(bot)</span>' : ''}
-      ${isHost() && p.bot ? `<button class="btn ghost small" data-remove="${esc(pid)}">Remove</button>` : ''}</li>`
-  ).join('') || '<li class="muted">Nobody yet.</li>';
-
-  $('host-tools').hidden = !isHost();
-  $('waiting').hidden = isHost();
-  if (isHost()) {
-    const taken = new Set(Object.values(players).map((p) => p.name));
-    const full = sorted.length >= MAX_PLAYERS;
-    $('bots').innerHTML = BOT_NAMES.filter((n) => !taken.has(n)).map((n) =>
-      `<button class="chip" data-bot="${esc(n)}" ${full ? 'disabled' : ''}>+ ${esc(n)}</button>`
-    ).join('') || '<span class="muted">All bots are in.</span>';
-    $('start').disabled = sorted.length < MIN_PLAYERS;
-  }
-}
-
-function renderGame() {
-  showSection('game');
-  const ed = S.EDITIONS.find((e) => e.id === meta.edition) || S.EDITIONS[0];
-  const D = S.makeDeck(ed);
-  $('game-title').textContent = `Game · ${ed.name}`;
-
-  const cards = myHand || [];
-  $('my-cards').innerHTML = cards.length
-    ? cards.map((c) => `<li>${esc(S.CAT_NAMES[D.catOf(c)])}: <strong>${esc(D.CARDS[c])}</strong></li>`).join('')
-    : '<li class="muted">Your cards will appear once the host deals.</li>';
-
-  const sorted = Object.entries(players).sort((a, b) => a[1].seat - b[1].seat);
-  $('game-players').innerHTML = sorted.map(([pid, p]) =>
-    `<li>${esc(p.name)}${p.bot ? ' <span class="muted">(bot)</span>' : ''}${pid === uid ? ' <span class="muted">(you)</span>' : ''} · ${p.handSize ?? '?'} cards</li>`
-  ).join('');
-}
-
-async function addBot(botName) {
-  if (!isHost()) return;
-  const id = 'bot-' + botName.toLowerCase();
-  await set(ref(db, roomPath(`players/${id}`)), { name: botName, seat: nextSeat(players), bot: true });
-}
-
-async function removeBot(id) {
-  if (!isHost()) return;
-  await remove(ref(db, roomPath(`players/${id}`)));
-}
-
-function shuffleInPlace(arr, rng) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-// Host only: pick the envelope, shuffle the rest and write each hand privately.
-async function startGame() {
-  if (!isHost()) return;
-  const list = Object.entries(players).sort((a, b) => a[1].seat - b[1].seat);
-  if (list.length < MIN_PLAYERS) throw new Error(`Need at least ${MIN_PLAYERS} players.`);
-
-  const ed = S.EDITIONS.find((e) => e.id === meta.edition) || S.EDITIONS[0];
-  const D = S.makeDeck(ed);
-  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  const rng = S.mulberry32(seed);
-
-  const envelope = [0, 1, 2].map((k) => D.CS[k] + Math.floor(rng() * D.SZ[k]));
-  const rest = [];
-  for (let c = 0; c < D.N; c++) if (!envelope.includes(c)) rest.push(c);
-  shuffleInPlace(rest, rng);
-
-  const sizes = S.defaultHands(list.length, rest.length);
-  const updates = {
-    'meta/status': 'playing',
-    'meta/startedAt': Date.now(),
-    'secret/envelope': envelope,
-  };
-  let k = 0;
-  list.forEach(([pid], i) => {
-    updates[`hands/${pid}`] = rest.slice(k, k + sizes[i]);
-    updates[`players/${pid}/handSize`] = sizes[i];
-    k += sizes[i];
+  doc.addEventListener('click', (e) => {
+    const el = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!el || el.disabled || el.classList.contains('off')) return;
+    const a = el.dataset.act;
+    switch (a) {
+      case 'create': run(createRoom); break;
+      case 'join': run(() => { const c = (ui.code || '').trim().toUpperCase(); if (!c) throw new Error('Type the room code first.'); return joinRoom(c); }); break;
+      case 'copy': run(async () => {
+        try { await win.navigator.clipboard.writeText(shareUrl()); msg = 'Link copied.'; }
+        catch (err) { const i = $('share'); if (i) { i.focus(); i.select(); } msg = 'Select the link and copy it.'; }
+      }); break;
+      case 'bot': run(() => addBot(el.dataset.n)); break;
+      case 'kick': run(() => removePlayer(el.dataset.p)); break;
+      case 'helper': run(() => (isHost() ? net.set(room('meta/helper'), !meta.helper) : null)); break;
+      case 'start': run(startGame); break;
+      case 'again': run(backToLobby); break;
+      case 'home': win.location.href = win.location.pathname; break;
+      case 'pick': ui.sel[+el.dataset.k] = +el.dataset.c; ui.confirm = false; render(); break;
+      case 'suggest': run(doSuggest); break;
+      case 'accuse': ui.confirm = true; render(); break;
+      case 'accuse-no': ui.confirm = false; render(); break;
+      case 'accuse-yes': run(doAccuse); break;
+      case 'accuse-open': ui.accusing = true; render(); break;
+      case 'accuse-back': resetPick(); render(); break;
+      case 'end': run(doEndTurn); break;
+      case 'show': run(() => showCard(+el.dataset.c)); break;
+      default: break;
+    }
   });
-  await update(ref(db, `rooms/${roomCode}`), updates);
-}
 
-async function boot() {
-  $('name').value = localStorage.getItem(NAME_KEY) || '';
-  const fromUrl = new URL(location.href).searchParams.get('room');
-  if (fromUrl) $('code').value = fromUrl.toUpperCase();
-
-  $('create').onclick = () => run(createRoom);
-  $('join').onclick = () => {
-    const code = $('code').value.trim().toUpperCase();
-    if (!code) return setMsg('Type the room code first.');
-    run(() => joinRoom(code));
-  };
-  $('copy').onclick = async () => {
-    await navigator.clipboard.writeText(shareUrl(roomCode));
-    setMsg('Link copied.');
-  };
-  $('start').onclick = () => run(startGame);
-  $('bots').onclick = (e) => { const b = e.target.closest('[data-bot]'); if (b) run(() => addBot(b.dataset.bot)); };
-  $('players').onclick = (e) => { const b = e.target.closest('[data-remove]'); if (b) run(() => removeBot(b.dataset.remove)); };
-
-  showSection('home');
-  if (fromUrl) setMsg('Enter your name, then join.');
-}
-
-async function run(fn) {
-  try {
-    setMsg('');
-    await fn();
-  } catch (err) {
-    setMsg(err.message || String(err));
+  // ---------- start ----------
+  async function boot() {
+    let fromUrl = null;
+    try { fromUrl = new win.URL(win.location.href).searchParams.get('room'); } catch (e) { fromUrl = null; }
+    if (fromUrl) ui.code = fromUrl.toUpperCase().slice(0, 5);
+    render();
+    if (!fromUrl) return;
+    // Coming back to a room I'm already in (reload, or the host reopening the page).
+    try {
+      const u = await net.ready();
+      if (u && (await net.get('rooms/' + ui.code + '/players/' + u))) { uid = u; enterRoom(ui.code); return; }
+    } catch (e) { /* fall through to the join form */ }
+    msg = 'Type your name, then tap Join room.';
+    render();
   }
-}
+  boot();
 
-boot();
+  return { state: () => ({ uid, roomCode, meta, players, game, myHand, myShown }) };
+}

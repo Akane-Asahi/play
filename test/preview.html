@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clues preview (fake network)</title>
+<link rel="stylesheet" href="../clue/style.css"><link rel="stylesheet" href="../clue/play.css"></head>
+<body>
+<header><span class="hside"></span><h1>Clues</h1><span class="hside"><span id="code-pill" class="pill" hidden></span></span></header>
+<main><div id="view"></div><p id="msg" class="warn center" role="status"></p></main>
+<script src="../clue/portraits.js"></script><script src="../clue/solver.js"></script>
+<script type="module">
+// Local preview without Firebase: ?step=home|lobby|turn|asked|watch|result|end  (bots: Sir, Bebun, Dada)
+import { startApp } from '../clue/app.js';
+import { FakeDb } from './fake-net.js';
+const step = new URLSearchParams(location.search).get('step') || 'turn';
+const db = new FakeDb(), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+startApp({ net: db.client('me'), doc: document, win: window, delays: { bot: step === 'end' ? 0 : step === 'watch' ? 400 : 150, none: 150 } });
+const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); return !!el; };
+(async () => {
+  if (step === 'home') return;
+  await wait(50);
+  const n = document.getElementById('name'); n.value = 'Telot'; n.dispatchEvent(new Event('input', { bubbles: true }));
+  click('[data-act=create]'); await wait(50);
+  for (const b of ['Sir', 'Bebun', 'Dada']) { click('[data-act=bot][data-n=' + b + ']'); await wait(20); }
+  if (step === 'lobby') return;
+  click('[data-act=start]'); await wait(100);
+  if (step === 'turn') { click('[data-act=pick][data-k="0"]'); return; }
+  for (let i = 0; i < 3000; i++) {
+    const g = db.read('rooms/' + document.getElementById('code-pill').textContent.slice(5) + '/game');
+    if (step === 'asked' && document.querySelector('.fc.tap') && g.log) return;
+    if (step === 'watch' && g.phase === 'answer' && g.cur.by !== 'me' && g.cur.order[g.cur.i] !== 'me') return;
+    if (step === 'result' && document.querySelector('[data-act=end]') && g.log.length > 4) return;
+    if (g.over) return;
+    if (!click('.fc.tap') && !click('[data-act=end]') && document.querySelector('[data-act=suggest]')) {
+      [0, 1, 2].forEach((k) => { const o = document.querySelectorAll('[data-act=pick][data-k="' + k + '"]'); o[Math.floor(Math.random() * o.length)].click(); });
+      click('[data-act=suggest]');
+    }
+    await wait(30);
+  }
+})();
+</script></body></html>

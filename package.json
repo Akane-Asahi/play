@@ -1,0 +1,11 @@
+{
+  "name": "play",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/engine.test.js && node test/app.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.1"
+  }
+}

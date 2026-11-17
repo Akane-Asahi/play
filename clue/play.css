@@ -1,0 +1,40 @@
+/* Extras for the multiplayer screens, on top of the Clues tracker styles in style.css */
+header .hside{flex:1;display:flex;justify-content:flex-end;min-width:0}
+header h1{flex:none}
+header .pill{cursor:default;font-weight:650;letter-spacing:.5px}
+main{padding-bottom:40px}
+.center{text-align:center}
+#code{text-transform:uppercase;letter-spacing:3px;font-weight:650}
+input[readonly]{color:var(--mute)}
+.btn.fit{width:auto;margin-top:0;flex:none;padding:9px 14px}
+.btn.mini{padding:5px 10px;font-size:12.5px}
+.row .btn.grow{margin-top:12px}
+.plist{display:flex;flex-direction:column}
+.pl{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);min-height:44px}
+.pl:first-child{border-top:0}
+.pl .grow{flex:1;font-size:13px}
+.pl.turn .pn{background:var(--red);color:#fff}
+.chip.still{cursor:default}
+.card.act{padding-bottom:16px}
+.card.act .banner{margin:0 0 4px}
+.banner.warnb{background:none;border:1px solid var(--bad);color:var(--ink);margin:14px 0 0}
+.banner.solvedb{background:none;border:1px solid var(--ok);color:var(--ink)}
+.banner.solvedb b{display:inline;font-size:inherit;color:var(--ok)}
+.switch{border-top:0;padding:0}
+table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
+.nt th{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--mute);font-weight:600;padding:2px 4px 6px;text-align:center}
+.nt th:first-child{text-align:left}
+.nt td{padding:6px 4px;border-top:1px solid var(--line);text-align:center}
+.nt td:first-child{text-align:left}
+.nt tr.cat td{border-top:0;padding-top:12px;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--mute);font-weight:600}
+.nt .pc{font-variant-numeric:tabular-nums;font-weight:650}
+.nt .y{color:var(--ok);font-weight:800}
+.nt .n{color:var(--mute);opacity:.6}
+.nt .q{color:var(--mute)}
+.nt tr.elim td:first-child,.nt tr.mine td:first-child{opacity:.55}
+.nt tr.elim .pc,.nt tr.mine .pc{color:var(--mute);font-weight:400}
+.nt tr.hit td{background:rgba(193,155,87,.14)}
+.nt tr.hit .pc{color:var(--accent)}
+.tt th:nth-child(1){width:5%}.tt th:nth-child(2){width:17%}.tt th:nth-child(3){width:23%}.tt th:nth-child(4){width:20%}.tt th:nth-child(5){width:18%}.tt th:nth-child(6){width:17%}
+.tt .evsub{text-align:left}
+.fc b.long,.fc.k1.art b.long,.fc.k2.art b.long{font-size:13.5px}
