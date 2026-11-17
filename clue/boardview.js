@@ -4,7 +4,11 @@ import * as B from './board.js';
 const TW = 40, TH = 20, WH = 14, TOP = WH + 12, OX = B.H * TW / 2;
 // Room scenes (isometric cutaway pictures), by room name without spaces/punctuation, lowercase.
 // Drawn on the board in place of the plain room. ratio = picture height / width.
-export const ROOM_ART = { library: { src: 'img/rooms/library-board.webp', ratio: 463 / 720, w: 176 }, study: { src: 'img/rooms/study-board.webp', ratio: 754 / 900, w: 176 } };
+export const ROOM_ART = {
+  library: { src: 'img/rooms/library-board.webp', ratio: 463 / 720, w: 176 },
+  study: { src: 'img/rooms/study-room.webp', ratio: 852 / 900, w: 176 },
+  ballroom: { src: 'img/rooms/ballroom-room.webp', ratio: 972 / 900, w: 176 },
+};
 export const SEAT_COLORS = ['#c62828', '#e1ad01', '#f2efe8', '#2e7d32', '#1565c0', '#8e24aa'];
 const FLOORS = ['#8b8f78', '#7d6c93', '#5c8a6a', '#94705c', '#4c7b72', '#7d5d49', '#8e5c6b', '#8d8062', '#5c6d8f'];
 const P = (x, y, z) => [(x - y) * TW / 2 + OX, (x + y) * TH / 2 + TOP - (z || 0)];
@@ -52,7 +56,13 @@ function spot(v, seat) {
 // o: { pos, order, me, turn, out:{pid}, roomNames:[9], go: { cells: Map, rooms: {} } | null }
 export function boardSvg(o) {
   const Hh = (B.W + B.H) * TH / 2 + TOP + 18;
-  let s = '<svg class="iso" viewBox="0 0 ' + (B.W * TW) + ' ' + Hh + '" role="img" aria-label="The mansion">' +
+  // A tall room picture may stick out above the mansion; make room for it.
+  let top = 0;
+  for (let k = 0; k < B.ROOMS; k++) {
+    const art = ROOM_ART[String(o.roomNames[k] || '').toLowerCase().replace(/[^a-z]/g, '')];
+    if (art) { const r = B.roomRect(k); top = Math.min(top, P(r.x + 4, r.y + 4)[1] + 9 - art.w * art.ratio - 2); }
+  }
+  let s = '<svg class="iso" viewBox="0 ' + top.toFixed(1) + ' ' + (B.W * TW) + ' ' + (Hh - top).toFixed(1) + '" role="img" aria-label="The mansion">' +
     '<defs><radialGradient id="cg"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient></defs>';
   // slab
   const A = P(0, 0), Bq = P(B.W, 0), C = P(B.W, B.H), Dq = P(0, B.H), dn = (p) => [p[0], p[1] + 12];
