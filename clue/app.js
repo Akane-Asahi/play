@@ -417,11 +417,14 @@ export function startApp({ net, doc, win, delays }) {
     return h;
   }
 
+  // Drawn as SVG so phones can't swap the tick for a coloured emoji; both take the button's colour.
+  const TICK = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const CROSS = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   // The notes sheet everyone gets: a tick or a cross per card and player, filled in by hand.
   function manualNotesHtml(D) {
     if (!meta.helper || !myHand) return '';
     const others = order().filter((p) => p !== uid);
-    const rd = (c, o, v, on) => '<button class="rd ' + v + (on ? ' on' : '') + '" role="radio" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + (v === 'y' ? 'Has it' : 'Does not have it') + '" data-act="mark" data-c="' + c + '" data-o="' + o + '" data-v="' + v + '">' + (v === 'y' ? '✓' : '✕') + '</button>';
+    const rd = (c, o, v, on) => '<button class="rd ' + v + (on ? ' on' : '') + '" role="radio" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + (v === 'y' ? 'Has it' : 'Does not have it') + '" data-act="mark" data-c="' + c + '" data-o="' + o + '" data-v="' + v + '">' + (v === 'y' ? TICK : CROSS) + '</button>';
     let h = '<section class="card"><h2>Your notes</h2><div class="nscroll"><table class="nt manual"><thead><tr><th></th><th>Envelope</th>' +
       others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
     [0, 1, 2].forEach((k) => {

@@ -89,3 +89,5 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 .rd.y.on{background:var(--ok);border-color:var(--ok);color:#10200f}
 .rd.n.on{background:var(--bad);border-color:var(--bad);color:#2a0f0d}
 .nt.manual tr.mine td.n{opacity:.5}
+.rd{display:inline-flex;align-items:center;justify-content:center}
+.rd svg{display:block}
