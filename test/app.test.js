@@ -8,7 +8,7 @@ const S = loadSolver();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function open(db, uid, query) {
-  const dom = new JSDOM('<header><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
+  const dom = new JSDOM('<header><span class="hside"><button id="players-btn" data-act="players" hidden></button></span><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
     { url: 'https://example.test/play/clue/' + (query || ''), pretendToBeVisual: true });
   const win = dom.window;
   win.ClueSolver = S;
@@ -205,6 +205,37 @@ async function play(db, cs, code, plan, until) {
   await wait(20);
   assert.deepEqual(again.qa('.rd.n.on').map(cellOf), [Bc], 'notes come back after a reload');
   console.log('F ok: Telot gets the calculation, others get a hand-filled sheet');
+}
+// G: choose cards from the notes, floating move bar, players list with marked cards only
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], []);
+  const g = db.read('rooms/' + code + '/game');
+  const me = cs.find((c) => c.uid === g.turn), other = cs.find((c) => c.uid !== g.turn);
+  assert(me.q('.float [data-act=suggest]').disabled, 'Suggest waits until three cards are chosen');
+  assert(!me.q('.card.act [data-act=pick]') && !me.q('.card.act .chip'), 'no card names in the Your turn section');
+  assert(!me.q('.plist') && !/\bPlayers\b/.test(me.text()), 'no Players section');
+  assert(!other.q('.float'), 'only the player on turn has the floating buttons');
+  [0, 1, 2].forEach((k) => me.click(me.qa('tr.pk td[data-act=pick][data-k="' + k + '"]')[0]));
+  assert.equal(me.qa('.nt tr.sel').length, 3, 'chosen cards are highlighted in the notes');
+  assert(!me.q('.float [data-act=suggest]').disabled);
+  me.click('tr.sel td[data-act=pick]');                 // tap again to unchoose
+  assert.equal(me.qa('.nt tr.sel').length, 2);
+  // players list: mark one card for the other player, open the list
+  const pid = other.uid, mark = me.qa('.rd.y').find((b) => b.dataset.o === pid);
+  const c0 = mark.dataset.c; me.click(mark);
+  assert(me.q('#players-btn') && !me.q('.ppanel'));
+  me.click('#players-btn'); assert(me.q('.ppanel'), 'list opens');
+  me.click('.ppanel [data-act=pexp][data-p="' + pid + '"]');
+  const hs = db.read('rooms/' + code + '/players/' + pid + '/handSize');
+  const chips = me.qa('.ppanel .pr.turn ~ .pr .chip, .ppanel .pr .pcards .chip').map((x) => x.textContent);
+  assert.equal(chips.length, hs, 'one chip per card they hold');
+  assert.equal(chips.filter((x) => x === '?').length, hs - 1, 'unmarked cards show as ?');
+  assert(!chips.includes('?') || chips.some((x) => x !== '?'), 'the marked card is named');
+  me.click('.ppanel [data-act=pexp][data-p="' + me.uid + '"]');
+  assert.equal(me.qa('.ppanel .pr')[cs.findIndex((c) => c.uid === me.uid)].querySelectorAll('.chip').length, me.app.state().myHand.length, 'my own cards in full');
+  me.click('.phead .x'); assert(!me.q('.ppanel'), 'list closes');
+  console.log('G ok: notes picking, floating buttons, players list');
 }
 console.log('app tests ok');
 process.exit(0);

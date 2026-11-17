@@ -3,11 +3,11 @@
 <title>Clues preview (fake network)</title>
 <link rel="stylesheet" href="../clue/style.css"><link rel="stylesheet" href="../clue/play.css"></head>
 <body>
-<header><span class="hside"></span><h1>Clues</h1><span class="hside"><span id="code-pill" class="pill" hidden></span></span></header>
+<header><span class="hside"><button id="players-btn" class="ib" data-act="players" aria-label="Players" hidden><svg viewBox="0 0 20 20" width="20" height="20"><path d="M7 5h10M7 10h10M7 15h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="3" cy="5" r="1.4" fill="currentColor"/><circle cx="3" cy="10" r="1.4" fill="currentColor"/><circle cx="3" cy="15" r="1.4" fill="currentColor"/></svg></button></span><h1>Clues</h1><span class="hside"><span id="code-pill" class="pill" hidden></span></span></header>
 <main><div id="view"></div><p id="msg" class="warn center" role="status"></p></main>
 <script src="../clue/portraits.js"></script><script src="../clue/solver.js"></script>
 <script type="module">
-// Local preview without Firebase: ?step=home|lobby|turn|asked|watch|result|end (end: add &t=seconds to freeze the finale at that moment)  (bots: Sir, Bebun, Dada)
+// Local preview without Firebase: ?step=home|lobby|turn|players|asked|watch|result|end (end: add &t=seconds to freeze the finale at that moment)  (bots: Sir, Bebun, Dada)
 import { startApp } from '../clue/app.js';
 import { FakeDb } from './fake-net.js';
 const qs = new URLSearchParams(location.search), step = qs.get('step') || 'turn', reveal = qs.get('t');
@@ -22,7 +22,11 @@ const click = (sel) => { const el = document.querySelector(sel); if (el) el.clic
   for (const b of ['Sir', 'Bebun', 'Dada']) { click('[data-act=bot][data-n=' + b + ']'); await wait(20); }
   if (step === 'lobby') return;
   click('[data-act=start]'); await wait(100);
-  if (step === 'turn') { click('[data-act=pick][data-k="0"]'); return; }
+  if (step === 'turn' || step === 'players') {
+    [0, 1].forEach((k) => click('tr.pk td[data-act=pick][data-k="' + k + '"]'));
+    if (step === 'players') { click('.rd.y'); click('#players-btn'); const ps = document.querySelectorAll('[data-act=pexp]'); ps.forEach((b) => b.click()); }
+    return;
+  }
   for (let i = 0; i < 3000; i++) {
     const g = db.read('rooms/' + document.getElementById('code-pill').textContent.slice(5) + '/game');
     if (step === 'asked' && document.querySelector('.fc.tap') && g.log) return;

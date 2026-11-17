@@ -20,7 +20,7 @@ export function startApp({ net, doc, win, delays }) {
   let meta = null, players = {}, game = null, myHand = null, myShown = null;
   let unsubs = [];
   let msg = '';
-  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
+  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
   let autoKey = null, hostBusy = false, hostDirty = false, helperKey = null, helperRes = null;
 
   // ---------- helpers ----------
@@ -310,24 +310,66 @@ export function startApp({ net, doc, win, delays }) {
     return h;
   }
 
-  function pickerHtml(D, accuseOnly) {
-    let h = '';
-    [0, 1, 2].forEach((k) => {
-      h += '<div class="muted" style="margin:10px 0 4px">' + S.CAT_PLURAL[k] + '</div><div class="chips">';
-      for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) h += chip(D, c, ui.sel[k] === c ? ' on' : '', ' data-act="pick" data-k="' + k + '" data-c="' + c + '"');
+  // Am I choosing a suspect, weapon and room right now? (Then the names in my notes can be tapped.)
+  function picking() {
+    const g = game;
+    if (!g || g.over || g.turn !== uid) return false;
+    if (g.phase === 'answer' || g.phase === 'accusing') return false;
+    return g.phase !== 'end' || ui.accusing;
+  }
+  // The first cell of a notes row: the card's name, tappable while I'm choosing.
+  function nameCell(D, c, k, mine, extra) {
+    const pk = picking();
+    return '<td' + (pk ? ' class="pkc" data-act="pick" data-k="' + k + '" data-c="' + c + '"' : '') + '>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') + (extra || '') + '</td>';
+  }
+  const selClass = (c, k) => (ui.sel[k] === c ? ' sel' : '') + (picking() ? ' pk' : '');
+
+  // The buttons that float at the bottom of the screen on my turn.
+  function floatHtml(D) {
+    const g = game;
+    if (!g || g.over || g.turn !== uid || g.phase === 'answer' || g.phase === 'accusing') return '';
+    const ready = ui.sel.every((c) => c != null);
+    let inner;
+    if (g.phase === 'end' && !ui.accusing) {
+      inner = '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Make an accusation</button></div>';
+    } else if (ui.confirm && ready) {
+      inner = '<div class="fsum warnt"><b>Accuse ' + esc(D.CARDS[ui.sel[0]]) + ' with the ' + esc(D.CARDS[ui.sel[1]]) + ' in the ' + esc(D.CARDS[ui.sel[2]]) + '?</b> If you are wrong, you are out.</div>' +
+        '<div class="row"><button class="btn danger grow" data-act="accuse-yes">Yes, accuse</button><button class="btn ghost grow" data-act="accuse-no">Cancel</button></div>';
+    } else {
+      const sum = ready ? ui.sel.map((c) => esc(D.CARDS[c])).join(' · ') : (ui.sel.some((c) => c != null) ? ui.sel.map((c, k) => c != null ? esc(D.CARDS[c]) : '<i>' + S.CAT_NAMES[k].toLowerCase() + '?</i>').join(' · ') : 'Tap a suspect, a weapon and a room in your notes');
+      inner = '<div class="fsum">' + sum + '</div>' + (g.phase === 'end'
+        ? '<div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">Back</button></div>'
+        : '<div class="row"><button class="btn grow" data-act="suggest"' + (ready ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>');
+    }
+    return '<div class="float" role="region" aria-label="Your move">' + inner + '</div>';
+  }
+
+  // Cards I know a player holds: my own hand in full; for others only what I have marked.
+  function knownCards(D, p) {
+    if (p === uid) return (myHand || []).slice().sort((a, b) => a - b);
+    const out = [], r = helper();
+    if (r) { const o = order().indexOf(p); for (let c = 0; c < D.CARDS.length; c++) if (r.certain[c] === o) out.push(c); }
+    else for (let c = 0; c < D.CARDS.length; c++) if (ui.notes[c + ':' + p] === 'y') out.push(c);
+    return out;
+  }
+  function playersPanel() {
+    if (!ui.plOpen || !game) return '';
+    const D = deck();
+    let h = '<div class="pbackdrop" data-act="players"></div><aside class="ppanel" role="dialog" aria-label="Players"><div class="phead"><b>Players</b><button class="x" data-act="players" aria-label="Close">×</button></div>';
+    order().forEach((p) => {
+      const open = !!ui.plExp[p], hs = players[p].handSize;
+      const known = knownCards(D, p), extra = p === uid || hs == null ? 0 : Math.max(0, hs - known.length);
+      h += '<div class="pr' + (game.turn === p && !game.over ? ' turn' : '') + '"><button class="prh" data-act="pexp" data-p="' + esc(p) + '" aria-expanded="' + open + '">' +
+        '<span class="pn">' + esc(nmFull(p)) + '</span><span class="muted grow">' +
+        [p === uid ? 'you' : '', players[p].bot ? 'bot' : '', (hs != null ? hs : '?') + ' cards', E.isOut(game, p) ? 'out' : '', game.turn === p && !game.over ? (p === uid ? 'your turn' : 'their turn') : ''].filter(Boolean).join(' · ') +
+        '</span><span class="chev">' + (open ? '▴' : '▾') + '</span></button>';
+      if (open) {
+        h += '<div class="chips pcards">' + known.map((c) => chip(D, c, ' still')).join('') + Array(extra).fill('<span class="chip still unk">?</span>').join('') +
+          (!known.length && !extra ? '<span class="muted">No cards.</span>' : '') + '</div>';
+      }
       h += '</div>';
     });
-    const ready = ui.sel.every((c) => c != null);
-    if (ui.confirm && ready) {
-      h += '<div class="banner warnb"><b>Accuse ' + esc(D.CARDS[ui.sel[0]]) + ' with the ' + esc(D.CARDS[ui.sel[1]]) + ' in the ' + esc(D.CARDS[ui.sel[2]]) + '?</b><br>If you are wrong, you are out of the game.</div>' +
-        '<div class="row"><button class="btn danger grow" data-act="accuse-yes">Yes, accuse</button><button class="btn ghost grow" data-act="accuse-no">Cancel</button></div>';
-    } else if (accuseOnly) {
-      h += '<div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">Back</button></div>';
-    } else {
-      h += '<div class="row"><button class="btn grow" data-act="suggest"' + (ready ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>' +
-        '<p class="muted center">Pick one suspect, one weapon and one room.</p>';
-    }
-    return h;
+    return h + '</aside>';
   }
 
   function respPills(cur) {
@@ -413,10 +455,8 @@ export function startApp({ net, doc, win, delays }) {
         fan(D, g.acc.cards) + '<p class="muted center">Checking the envelope…</p>';
     }
     if (g.turn === me) {
-      if (g.phase === 'end' && !ui.accusing) {
-        return lastResultHtml(D, true) + '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Make an accusation</button></div>';
-      }
-      return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>' + pickerHtml(D, g.phase === 'end');
+      if (g.phase === 'end' && !ui.accusing) return lastResultHtml(D, true) + '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
+      return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>';
     }
     let h = g.phase === 'end' ? lastResultHtml(D, false) : '';
     h += '<div class="ask"><div class="muted">' + (g.phase === 'end' ? 'Waiting for' : 'Turn') + '</div><div class="who">' + esc(nmFull(g.turn)) + '</div><div class="muted">' +
@@ -430,7 +470,8 @@ export function startApp({ net, doc, win, delays }) {
   const CROSS = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   // The notes sheet everyone gets: a tick or a cross per card and player, filled in by hand.
   function manualNotesHtml(D) {
-    if (!meta.helper || !myHand) return '';
+    if (!myHand) return '';
+    if (!meta.helper) return pickOnlyHtml(D);
     const others = order().filter((p) => p !== uid);
     const rd = (c, o, v, on) => '<button class="rd ' + v + (on ? ' on' : '') + '" role="radio" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + (v === 'y' ? 'Has it' : 'Does not have it') + '" data-act="mark" data-c="' + c + '" data-o="' + o + '" data-v="' + v + '">' + (v === 'y' ? TICK : CROSS) + '</button>';
     let h = '<section class="card"><h2>Your notes</h2><div class="nscroll"><table class="nt manual"><thead><tr><th></th><th>Envelope</th>' +
@@ -439,7 +480,7 @@ export function startApp({ net, doc, win, delays }) {
       h += '<tr class="cat"><td colspan="' + (2 + others.length) + '">' + S.CAT_PLURAL[k] + '</td></tr>';
       for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
         const mine = myHand.includes(c);
-        h += '<tr class="' + (mine ? 'mine' : '') + '"><td>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') + '</td>';
+        h += '<tr class="' + (mine ? 'mine' : '') + selClass(c, k) + '">' + nameCell(D, c, k, mine);
         ['env'].concat(others).forEach((o) => {
           const v = ui.notes[c + ':' + o];
           h += mine ? '<td class="n">–</td>' : '<td class="mk">' + rd(c, o, 'y', v === 'y') + rd(c, o, 'n', v === 'n') + '</td>';
@@ -447,7 +488,17 @@ export function startApp({ net, doc, win, delays }) {
         h += '</tr>';
       }
     });
-    return h + '</tbody></table></div><p class="muted">Tap ✓ if they have the card (or it is in the envelope), ✕ if they don\'t. Tap again to clear.</p></section>';
+    return h + '</tbody></table></div><p class="muted">Tap ✓ if they have the card (or it is in the envelope), ✕ if they don\'t. Tap again to clear.' + (picking() ? ' Tap a card name to choose it.' : '') + '</p></section>';
+  }
+
+  // With the notes sheet switched off there is still a list to choose cards from.
+  function pickOnlyHtml(D) {
+    let h = '<section class="card"><h2>Cards</h2><table class="nt pickonly"><tbody>';
+    [0, 1, 2].forEach((k) => {
+      h += '<tr class="cat"><td>' + S.CAT_PLURAL[k] + '</td></tr>';
+      for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) h += '<tr class="' + (myHand.includes(c) ? 'mine' : '') + selClass(c, k) + '">' + nameCell(D, c, k, myHand.includes(c)) + '</tr>';
+    });
+    return h + '</tbody></table></section>';
   }
 
   function notesHtml(D) {
@@ -462,7 +513,7 @@ export function startApp({ net, doc, win, delays }) {
       for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
         const mine = myHand.includes(c), inEnv = r.certain[c] === E_, canEnv = r.possible[c][E_];
         const pct = inEnv ? '100%' : !canEnv ? '–' : r.prob ? Math.round(r.prob[c][E_] * 100) + '%' : '?';
-        h += '<tr class="' + (mine ? 'mine' : inEnv ? 'hit' : !canEnv ? 'elim' : '') + '"><td>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') + '</td><td class="pc">' + pct + '</td>' +
+        h += '<tr class="' + (mine ? 'mine' : inEnv ? 'hit' : !canEnv ? 'elim' : '') + selClass(c, k) + '">' + nameCell(D, c, k, mine) + '<td class="pc">' + pct + '</td>' +
           others.map((p) => { const o = ord.indexOf(p); return '<td class="' + (r.certain[c] === o ? 'y">✓' : !r.possible[c][o] ? 'n">✕' : 'q">?') + '</td>'; }).join('') + '</tr>';
       }
     });
@@ -498,10 +549,7 @@ export function startApp({ net, doc, win, delays }) {
     let h = '<section class="card act">' + actionHtml(D) + '</section>';
     h += '<section class="card"><h2>Your cards</h2><div class="chips">' +
       (myHand && myHand.length ? myHand.map((c) => chip(D, c, ' still')).join('') : '<span class="muted">Dealing…</span>') + '</div></section>';
-    h += '<section class="card"><h2>Players</h2><div class="plist">' + ord.map((p) =>
-      '<div class="pl' + (game.turn === p && !game.over ? ' turn' : '') + '"><span class="pn">' + esc(nmFull(p)) + '</span><span class="muted grow">' +
-      [p === uid ? 'you' : '', players[p].bot ? 'bot' : '', (players[p].handSize != null ? players[p].handSize : '?') + ' cards', E.isOut(game, p) ? 'out' : '', game.turn === p && !game.over ? (p === uid ? 'your turn' : 'their turn') : ''].filter(Boolean).join(' · ') + '</span></div>').join('') + '</div></section>';
-    return h + notesHtml(D) + turnsHtml(D);
+    return h + notesHtml(D) + turnsHtml(D) + floatHtml(D);
   }
 
   function render() {
@@ -513,7 +561,10 @@ export function startApp({ net, doc, win, delays }) {
     else if (!players[uid]) h = '<section class="card"><p>You are no longer in this room.</p><button class="btn" data-act="home">Back to start</button></section>';
     else if (meta.status === 'playing') h = gameHtml();
     else h = lobbyHtml();
-    $('view').innerHTML = h;
+    const inGame = !!(roomCode && meta && meta.status === 'playing' && players[uid] && game);
+    const pb = $('players-btn');
+    if (pb) pb.hidden = !inGame;
+    $('view').innerHTML = h + (inGame ? playersPanel() : '');
     $('msg').textContent = msg;
     if (roomCode && meta && meta.status === 'playing') { autoNone(); hostTick(); }
   }
@@ -549,7 +600,9 @@ export function startApp({ net, doc, win, delays }) {
       case 'start': run(startGame); break;
       case 'again': run(backToLobby); break;
       case 'home': win.location.href = win.location.pathname; break;
-      case 'pick': ui.sel[+el.dataset.k] = +el.dataset.c; ui.confirm = false; render(); break;
+      case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
+      case 'players': ui.plOpen = !ui.plOpen; render(); break;
+      case 'pexp': ui.plExp[el.dataset.p] = !ui.plExp[el.dataset.p]; render(); break;
       case 'suggest': run(doSuggest); break;
       case 'accuse': ui.confirm = true; render(); break;
       case 'accuse-no': ui.confirm = false; render(); break;
