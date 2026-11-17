@@ -13,7 +13,9 @@ Create a room, share the link, and friends join from their own phones. Add bots 
 
 ## Run it
 
-No build step. Serve the folder with any static server, or use GitHub Pages from `main`, root.
+No build step. The Clue game lives in the `clue/` folder. Serve the repo with any static server, or use GitHub Pages from `main`, root. The game is then at `/clue/`, for example `https://akane-asahi.github.io/play/clue/`.
+
+Each game gets its own folder. The Firebase rules at the root protect the `rooms/` path, so a new game that shares the database needs its own path in the rules.
 
 ## How it works
 
@@ -26,7 +28,8 @@ No build step. Serve the folder with any static server, or use GitHub Pages from
 
 ## Files
 
-- `index.html`, `style.css`, `app.js`: the lobby and game screen
-- `solver.js`: the deduction engine and deck helpers, copied from the Clues repo
-- `portraits.js`, `img/`: card art
-- `database.rules.json`: the Realtime Database rules
+- `clue/index.html`, `clue/style.css`, `clue/app.js`: the lobby and game screen
+- `clue/firebase-config.js`: the web config
+- `clue/solver.js`: the deduction engine and deck helpers, copied from the Clues repo
+- `clue/portraits.js`, `clue/img/`: card art
+- `database.rules.json`: the Realtime Database rules (repo root)
