@@ -615,11 +615,11 @@ export function startApp({ net, doc, win, delays }) {
     }
     let h = '<div class="ask"><div class="muted">' + (e.t === 'a' ? 'Accusation' : 'Suggestion') + '</div><div class="who">' + esc(nmFull(e.by)) + '</div><div class="muted">' + (e.t === 'a' ? 'accused' : 'asked about') + '</div></div>' + fan(D, e.cards);
     if (e.t === 'a') {
-      h += '<div class="banner"><b>' + esc(nm(e.by)) + ' was wrong and is out of the game.</b><br>' + esc(names) + '</div>';
+      h += '<p class="rnote">' + esc(nm(e.by)) + ' was wrong and is out of the game.</p>';
     } else {
       const resp = e.resp || [], shower = resp.find((r) => r.r === 'showed');
       h += '<div class="pills">' + resp.map((r) => '<span class="pill done">' + esc(nm(r.p)) + ' · ' + (r.r === 'none' ? 'passed' : 'showed a card') + '</span>').join('') + '</div>';
-      h += '<div class="banner"><b>' + (shower ? esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.' : 'Nobody had any of these.') + '</b></div>';
+      h += '<p class="rnote">' + (shower ? esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.' : 'Nobody had any of these.') + '</p>';
     }
     return h + '<button class="btn" data-act="next">Next turn</button>';
   }

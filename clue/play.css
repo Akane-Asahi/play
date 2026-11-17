@@ -150,3 +150,4 @@ main{padding-bottom:150px}
 .dice{display:flex;gap:8px;justify-content:center;margin:6px 0 4px}
 @media (prefers-reduced-motion:reduce){.iso .go{animation:none}}
 .lg em{font-style:normal;opacity:.6;font-size:11px}
+.rnote{text-align:center;font-size:15px;font-weight:600;color:var(--ink);margin:12px 0 0}
