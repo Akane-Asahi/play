@@ -505,7 +505,7 @@ async function play(db, cs, code, plan, until) {
   const path = 'rooms/' + code + '/game';
   let g = db.read(path);
   const me = cs.find((c) => c.uid === g.turn), other = cs.find((c) => c.uid !== g.turn);
-  const lab = (c, k) => c.q('[data-act=card][data-k=' + k + ']').textContent.replace(/\s+/g, ' ').trim();
+  const lab = (c, k) => { const b = c.q('[data-act=card][data-k=' + k + ']'); return b.getAttribute('title') + ' ' + b.textContent.trim(); };
   assert.deepEqual(['s', 'j', 'w'].map((k) => lab(me, k)), ['Sprint 3', 'Jog 5', 'Walk 4'], 'three buttons with what is left');
   assert(!me.q('.stam:disabled') && other.qa('.stam').every((x) => x.disabled), 'only the player on turn can press them');
   assert(me.q('.legend .cc') && /3·5·4/.test(me.q('.legend').textContent), 'everyone can see the counts');
@@ -539,7 +539,7 @@ async function play(db, cs, code, plan, until) {
   // Tired
   const t = cs.find((c) => c.uid === db.read(path).turn);
   db.write(path, { ...db.read(path), cards: { ...db.read(path).cards, [t.uid]: { s: 0, j: 0, w: 0 } } }); db.notify(); await wait(20);
-  assert(t.qa('[data-act=card]').length === 1 && /Tired/.test(t.q('[data-act=card]').textContent) && /tired/.test(t.q('.legend').textContent), 'with nothing left there is one Tired button');
+  assert(t.qa('[data-act=card]').length === 1 && /Tired/.test(t.q('[data-act=card]').getAttribute('title')) && /tired/.test(t.q('.legend').textContent), 'with nothing left there is one Tired button');
   t.click('[data-act=card][data-k=f]'); await wait(10);
   const cells = t.qa('[data-act=go]');
   assert(cells.length > 0 && cells.length < 30, 'Tired glows a couple of squares');

@@ -826,17 +826,25 @@ export function startApp({ net, doc, win, delays, load3d }) {
   const ICON_TURNS = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   // Round buttons bottom right, sitting just above the move buttons (they share one fixed column).
   // Sprint / Jog / Walk, bottom left: they only show where I can go; the card is spent when I pick the square.
+  const ICON_CARD = {
+    s: '<path d="M13.5 2.5L5.5 13.5h5.5l-1 8 8-11h-5.5z" fill="currentColor"/>',
+    j: '<path d="M5 6l6 6-6 6M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+    w: '<path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+    f: '<path d="M6 7h6l-6 8h6M14 4h4l-4 5h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  };
+  // Sprint / Jog / Walk: round buttons in the right-hand column, above Turns and Notes. They only show where I can go;
+  // the card is spent when I pick the square.
   function stamHtml() {
     const g = game;
     if (!hasMap() || g.over || !g.cards || !g.cards[uid] || E.isOut(g, uid)) return '';
     const c = E.cardsOf(g, uid), mine = g.turn === uid && g.phase === 'move', tir = E.tired(g, uid);
-    const btn = (k, n, tag) => '<button class="stam k-' + k + (mine && ui.card === k ? ' on' : '') + (n ? '' : ' zero') + '" data-act="card" data-k="' + k + '"' + (mine && n ? '' : ' disabled') + ' aria-pressed="' + (mine && ui.card === k ? 'true' : 'false') +
-      '" aria-label="' + E.CARD_NAMES[k] + ', ' + tag + ', up to ' + E.STEPS[k] + ' spaces">' + E.CARD_NAMES[k] + ' <b>' + tag + '</b></button>';
+    const btn = (k, n, tag) => '<button class="fab stam k-' + k + (mine && ui.card === k ? ' on' : '') + (n ? '' : ' zero') + '" data-act="card" data-k="' + k + '"' + (mine && n ? '' : ' disabled') + ' aria-pressed="' + (mine && ui.card === k ? 'true' : 'false') +
+      '" aria-label="' + E.CARD_NAMES[k] + ', ' + tag + (k === 'f' ? ' spaces' : ' left') + ', up to ' + E.STEPS[k] + ' spaces" title="' + E.CARD_NAMES[k] + '"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">' + ICON_CARD[k] + '</svg><b>' + tag + '</b></button>';
     return '<div class="stams" role="group" aria-label="Your stamina">' + (tir ? btn('f', 1, '2') : ['s', 'j', 'w'].map((k) => btn(k, c[k], String(c[k]))).join('')) + '</div>';
   }
   function hudHtml(D) {
     const notes = notesHtml(D) ? '<button class="fab' + (ui.sheet === 'notes' ? ' on' : '') + '" data-act="sheet" data-s="notes" aria-label="Your notes">' + ICON_NOTES + '</button>' : '';
-    return '<div class="hud"><div class="hrow">' + stamHtml() + '<div class="fabs"><button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div></div>' + floatHtml(D) + '</div>';
+    return '<div class="hud"><div class="hrow"><div class="fabs">' + stamHtml() + '<button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div></div>' + floatHtml(D) + '</div>';
   }
   function sheetHtml(D) {
     if (!ui.sheet) return '';
