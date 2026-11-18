@@ -807,7 +807,11 @@ export function startApp({ net, doc, win, delays }) {
     if (pb) pb.hidden = !inGame;
     const html = h + (inGame ? playersPanel() : '');
     if (html !== ui.lastHtml) { $('view').innerHTML = html; ui.lastHtml = html; }    // same picture: leave it alone, so nothing re-animates
-    $('msg').textContent = msg;
+    const mk = (ui.info ? 'i' : 'w') + msg;
+    if (ui.msgKey !== mk) {                                    // only touch it when it changes, so it doesn't re-animate
+      ui.msgKey = mk;
+      $('msg').innerHTML = msg ? '<span class="mt">' + esc(msg) + '</span>' + (ui.info ? '' : '<button class="mx" data-act="msg-close" aria-label="Dismiss">×</button>') : '';
+    }
     $('msg').className = 'toast ' + (ui.info ? 'ok' : 'warn');
     syncHold(inGame && !game.over && !!ui.holdWant);
     if (roomCode && meta && meta.status === 'playing') { hostTick(); }
@@ -840,6 +844,7 @@ export function startApp({ net, doc, win, delays }) {
     if (!el || el.disabled || el.classList.contains('off')) return;
     const a = el.getAttribute('data-act');
     switch (a) {
+      case 'msg-close': msg = ''; ui.info = false; render(); break;
       case 'create': try { msg = ''; needName(); ui.choosing = true; } catch (err) { msg = err.message; } render(); break;
       case 'mk': run(() => createRoom(el.dataset.m)); break;
       case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), el.dataset.m === 'full' ? 'full' : 'fast') : null)); break;

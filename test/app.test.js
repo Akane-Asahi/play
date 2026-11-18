@@ -18,7 +18,7 @@ function open(db, uid, query) {
   const q = (sel) => win.document.querySelector(sel), qa = (sel) => Array.from(win.document.querySelectorAll(sel));
   const click = (sel) => { const el = typeof sel === 'string' ? q(sel) : sel; assert(el, 'missing ' + sel + ' for ' + uid + '\n' + q('#view').innerHTML.slice(0, 400)); el.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); };
   const type = (id, v) => { const el = q('#' + id); assert(el, 'missing #' + id); el.value = v; el.dispatchEvent(new win.Event('input', { bubbles: true })); };
-  return { uid, win, app, q, qa, click, type, msg: () => q('#msg').textContent, text: () => q('#view').textContent };
+  return { uid, win, app, q, qa, click, type, msg: () => { const m = q('#msg .mt'); return m ? m.textContent : ''; }, text: () => q('#view').textContent };
 }
 const clean = (cs) => cs.forEach((c) => assert.equal(c.msg(), '', c.uid + ' sees: ' + c.msg()));
 
@@ -397,6 +397,17 @@ async function play(db, cs, code, plan, until) {
   const g2 = db.read('rooms/' + code + '/game');
   assert(g2.phase === 'roll' && !g2.win && !g2.req, 'passing carries on with the next turn');
   console.log('M ok: queued final accusation, prompt, pass');
+}
+// N: error messages can be dismissed with a cross
+{
+  const db = new FakeDb();
+  const c = open(db, 'h1');
+  await wait(20);
+  c.click('[data-act=join]'); await wait(20);
+  assert(c.msg().length > 0 && c.q('#msg [data-act=msg-close]'), 'an error shows with a cross');
+  c.click('#msg [data-act=msg-close]'); await wait(10);
+  assert(c.msg() === '' && !c.q('#msg [data-act=msg-close]'), 'the cross dismisses it');
+  console.log('N ok: error message has a cross');
 }
 console.log('app tests ok');
 process.exit(0);
