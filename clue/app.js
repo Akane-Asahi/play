@@ -731,7 +731,7 @@ export function startApp({ net, doc, win, delays }) {
     if (!isHost()) return '';
     if (!ui.cancel) return '<button class="btn danger cancelg" data-act="cancel">Cancel game</button>';
     return '<section class="card cancelc"><p><b>Cancel this game for everyone?</b> The room and everything in it is deleted. This can\'t be undone.</p>' +
-      '<div class="row"><button class="btn danger grow" data-act="cancel-yes">Yes, cancel game</button><button class="btn ghost grow" data-act="cancel-no">Keep playing</button></div></section>';
+      '<div class="row"><button class="btn danger grow" data-act="cancel-yes">Yes, cancel</button><button class="btn ghost grow" data-act="cancel-no">Keep playing</button></div></section>';
   }
 
   function gameHtml() {
