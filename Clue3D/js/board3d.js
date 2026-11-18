@@ -133,7 +133,7 @@ export function buildBoard(scene) {
     rooms.push({ k, group: g, floor, props, beam, label: name });
   }
 
-  // reachable-square markers (instanced, count changes per roll)
+  // reachable-square markers (instanced, count changes per card)
   const markGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.06, 20);
   const marks = new THREE.InstancedMesh(markGeo, new THREE.MeshBasicMaterial({ color: '#ffb52e' }), 140);
   marks.count = 0; root.add(marks);

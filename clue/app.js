@@ -2,7 +2,7 @@
 // (see main.js for the Firebase version), so the same code runs in tests against a fake.
 import * as E from './engine.js';
 import * as B from './board.js';
-import { boardSvg, dieSvg, SEAT_COLORS } from './boardview.js';
+import { boardSvg, SEAT_COLORS } from './boardview.js';
 
 // Game modes chosen in the lobby. '3d' is the full game (same rules, same room) with the mansion drawn in 3D.
 const MODES = ['fast', 'full', '3d'];
@@ -29,7 +29,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   let gone = false;
   let unsubs = [];
   let msg = '';
-  const ui = { notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, choosing: false, selKey: null, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
+  const ui = { card: null, notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, choosing: false, selKey: null, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
   let hostBusy = false, hostDirty = false, helperKey = null, helperRes = null, botPlan = null;
 
   // ---------- helpers ----------
@@ -217,12 +217,22 @@ export function startApp({ net, doc, win, delays, load3d }) {
   const full = () => E.isFull(game);
   const hereCard = () => E.roomCardHere(game, uid);
   const sugReady = () => ui.sel.every((c) => c != null) && (!full() || ui.sel[2] === hereCard());
-  const die = () => 1 + Math.floor(Math.random() * 6);
-  const doRoll = () => tx((g) => E.roll(g, uid, [die(), die()]));
   const doPassage = () => tx((g) => E.passage(g, uid));
   const doStayIn = () => tx((g) => E.stayIn(g, uid));
   const wasCalled = () => !!(game && game.called && game.called[uid]);
-  const doMove = (d) => tx((g) => E.move(g, uid, d));
+  // A card only shows where I can go; it is spent when I pick the square or room.
+  async function doMove(d) {
+    const c = ui.card;
+    if (d !== 'stay' && !c) { toast('Pick Sprint, Jog or Walk first'); return; }
+    ui.card = null;
+    await tx((g) => E.move(g, uid, d, c));
+  }
+  async function doDeduce() {
+    if (!game || !E.canDeduce(game, uid)) { toast('Deduce unlocks once a kind of card runs out'); return; }
+    ui.card = null;
+    const ord = order();
+    await tx((g) => E.deduce(g, uid, ord));
+  }
   async function doEndTurn() {
     const ord = order();
     resetPick();
@@ -270,7 +280,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       });
       return tx((x) => (same(x) ? E.answer(x, p, 'showed') : undefined));
     }
-    if (['suggest', 'end', 'roll', 'move'].includes(g.phase) && isBot(g.turn)) {
+    if (['suggest', 'end', 'move'].includes(g.phase) && isBot(g.turn)) {
       const p = g.turn;
       if (onHold()) return false;
       await sleep(D0.bot);
@@ -281,15 +291,18 @@ export function startApp({ net, doc, win, delays, load3d }) {
         botPlan = { key, mv: E.botThink(S, E.solverState(edition(), players, ord, p, hand, g, shown), Math.random) };
       }
       const mv = botPlan.mv;
-      if (g.phase === 'move') return tx((x) => (x && x.phase === 'move' && x.turn === p ? E.move(x, p, E.botMove(x, p, mv.suggest ? mv.suggest[2] - x.rc0 : -1, Math.random)) : undefined));
+      if (g.phase === 'move') {
+        const a = E.botTurn(g, p, mv.suggest ? mv.suggest[2] - g.rc0 : -1, Math.random);
+        return tx((x) => {
+          if (!x || x.phase !== 'move' || x.turn !== p) return undefined;
+          if (a.act === 'passage') return E.passage(x, p);
+          if (a.act === 'deduce') return E.deduce(x, p, ord);
+          if (a.act === 'move') return E.move(x, p, a.dest, a.card);
+          return (x.called && x.called[p] ? E.stayIn(x, p) : null) || E.move(x, p, 'stay');
+        });
+      }
       if (mv.accuse) return tx((x) => E.accuse(x, p, mv.accuse));
       if (g.phase === 'end') return tx((x) => E.endTurn(x, p, ord));
-      if (g.phase === 'roll') {
-        const here = B.roomOf(g.pos[p]);
-        if (g.called && g.called[p]) return tx((x) => E.stayIn(x, p));
-        if (B.PASSAGE[here] != null && B.PASSAGE[here] === mv.suggest[2] - g.rc0) return tx((x) => E.passage(x, p));
-        return tx((x) => E.roll(x, p, [die(), die()]));
-      }
       const cards = mv.suggest.slice();
       if (E.isFull(g)) cards[2] = E.roomCardHere(g, p);
       return tx((x) => E.suggest(x, p, cards, ord));
@@ -350,7 +363,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       '</select>' + (ui.choosing
         ? '<p class="muted" style="margin-top:12px">What kind of game?</p><div class="modes">' +
           '<button class="mode" data-act="mk" data-m="fast"><b>Fast game</b><span>Cards only. Take turns making suggestions, no board.</span></button>' +
-          '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Roll the dice, walk the mansion and suggest in the room you enter.</span></button>' +
+          '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Spend Sprint, Jog and Walk cards to cross the mansion and suggest in the room you enter.</span></button>' +
           '<button class="mode" data-act="mk" data-m="3d"><b>3D game</b><span>The full game with the mansion in 3D. Same rules, same room.</span></button></div>'
         : '<button class="btn" data-act="create">Create room</button>') + '</section>' +
       '<section class="card"><h2>Join a room</h2><p class="muted">Type the code a friend sent you, or open their link.</p>' +
@@ -378,12 +391,12 @@ export function startApp({ net, doc, win, delays, load3d }) {
         '</div><p class="muted">Bots play on your device, so keep this page open during the game.</p></section>';
       h += '<section class="card"><div class="switch"><div><b>Notes sheet for everyone</b><div class="muted">Each player gets a sheet to tick and cross by hand as they work out the case.</div></div>' +
         '<button class="tog' + (meta.helper ? ' on' : '') + '" data-act="helper" aria-label="Toggle notes"></button></div></section>';
-      h += '<section class="card"><h2>Game</h2><div class="modes">' + [['fast', 'Fast game', 'Cards only, no board.'], ['full', 'Full game', 'Dice, the mansion and rooms.'], ['3d', '3D game', 'The full game, the mansion in 3D.']].map((m) =>
+      h += '<section class="card"><h2>Game</h2><div class="modes">' + [['fast', 'Fast game', 'Cards only, no board.'], ['full', 'Full game', 'Movement cards, the mansion and rooms.'], ['3d', '3D game', 'The full game, the mansion in 3D.']].map((m) =>
         '<button class="mode' + ((meta.mode || 'fast') === m[0] ? ' on' : '') + '" data-act="setmode" data-m="' + m[0] + '"><b>' + m[1] + '</b><span>' + m[2] + '</span></button>').join('') + '</div></section>';
       h += '<button class="btn" data-act="start"' + (ord.length < E.MIN_PLAYERS ? ' disabled' : '') + '>Start game</button>' +
         (ord.length < E.MIN_PLAYERS ? '<p class="muted center">You need at least ' + E.MIN_PLAYERS + ' players. Add a bot or invite a friend.</p>' : '');
     } else {
-      h += '<p class="muted center">' + (meta.mode === '3d' ? '3D game: the full game with the mansion in 3D. ' : meta.mode === 'full' ? 'Full game with dice and the mansion. ' : 'Fast game. ') + 'Waiting for ' + esc(nmFull(meta.host)) + ' to start the game.</p>';
+      h += '<p class="muted center">' + (meta.mode === '3d' ? '3D game: the full game with the mansion in 3D. ' : meta.mode === 'full' ? 'Full game with movement cards and the mansion. ' : 'Fast game. ') + 'Waiting for ' + esc(nmFull(meta.host)) + ' to start the game.</p>';
     }
     return h;
   }
@@ -395,7 +408,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
     if (E.windowWho(g) === uid) return !!ui.accusing;
     if (g.turn !== uid) return false;
     if (g.phase === 'answer' || g.phase === 'accusing' || g.phase === 'window') return false;
-    if (g.phase === 'roll' || g.phase === 'move' || g.phase === 'end') return !!ui.accusing;     // only when making a final accusation
+    if (g.phase === 'move' || g.phase === 'end') return !!ui.accusing;     // only when making a final accusation
     return true;
   }
   // The first cell of a notes row: the card's name, tappable while I'm choosing.
@@ -405,6 +418,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
   }
   const selClass = (c, k) => (ui.sel[k] === c ? ' sel' : '') + (picking() ? ' pk' : '');
 
+  const LOCK = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.6" fill="currentColor"/><path d="M5.2 7V5.2a2.8 2.8 0 015.6 0V7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  const LOCK_OPEN = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.6" fill="currentColor"/><path d="M5.2 7V5.2a2.8 2.8 0 015.4-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   // The buttons that float at the bottom of the screen on my turn.
   // The Final Accusation button is always there. On my own turn it opens the accusation at once; otherwise it puts
   // my name in the queue, and I'm asked when the turn in progress is over.
@@ -412,7 +427,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
     const g = game;
     if (!g || g.over) return '';
     const prompted = E.windowWho(g) === uid;
-    const mine = g.turn === uid && ['roll', 'move', 'suggest', 'end'].includes(g.phase);
+    const mine = g.turn === uid && ['move', 'suggest', 'end'].includes(g.phase);
     if (!mine && !prompted) {
       if (E.isOut(g, uid) || g.phase === 'accusing' || g.turn === uid) return '';
       const queued = !!(g.req && g.req[uid]);
@@ -432,13 +447,15 @@ export function startApp({ net, doc, win, delays, load3d }) {
     } else if (ui.accusing) {
       const sum = ready ? ui.sel.map((c) => esc(D.CARDS[c])).join(' · ') : (ui.sel.some((c) => c != null) ? ui.sel.map((c, k) => c != null ? esc(D.CARDS[c]) : '<i>' + S.CAT_NAMES[k].toLowerCase() + '?</i>').join(' · ') : 'Tap a suspect, a weapon and a room in your notes');
       inner = '<div class="fsum">' + sum + '</div><div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">' + (prompted ? 'Back' : 'Cancel') + '</button></div>';
-    } else if (g.phase === 'roll') {
-      const to = B.PASSAGE[B.roomOf(g.pos[uid])];
-      inner = '<div class="row"><button class="btn grow" data-act="roll">Roll Dice</button>' +
-        (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>' + accuseBtn;
     } else if (g.phase === 'move') {
-      const rr = g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null, mustLeave = g.again && rr && (rr.cells.size || Object.keys(rr.rooms).length);
-      inner = '<div class="fsum">Tap a glowing square or room on the board' + (mustLeave ? ' — you have to leave the room' : '') + '</div>' + (mustLeave ? '' : '<div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>') + accuseBtn;
+      const here = B.roomOf(g.pos[uid]), to = B.PASSAGE[here], mustLeave = g.again && E.canLeave(g, uid), can = E.canDeduce(g, uid), tir = E.tired(g, uid);
+      const hint = ui.card ? 'Tap a glowing square or room to use your ' + E.CARD_NAMES[ui.card] + ' (up to ' + E.STEPS[ui.card] + ' spaces)'
+        : mustLeave ? 'You have to leave the room: pick a card' : tir ? 'You are tired: pick Tired to move 2 spaces, or Deduce' : 'Pick Sprint, Jog or Walk to see where you can go';
+      inner = '<div class="fsum">' + hint + '</div><div class="row">' +
+        '<button class="btn grow dbtn ' + (can ? 'open' : 'locked') + '" data-act="deduce" aria-label="Deduce, ' + (can ? 'unlocked' : 'locked') + '">' + (can ? LOCK_OPEN : LOCK) + ' Deduce <em>' + (can ? 'unlocked' : 'locked') + '</em></button>' +
+        (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') +
+        (wasCalled() && here >= 0 && !g.again ? '<button class="btn ghost grow" data-act="stayin">Suggest here</button>' : (!mustLeave ? '<button class="btn ghost grow" data-act="stay">Stay put</button>' : '')) +
+        '</div>' + accuseBtn;
     } else if (g.phase === 'end') {
       inner = '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Final Accusation</button></div>';
     } else {
@@ -553,12 +570,10 @@ export function startApp({ net, doc, win, delays, load3d }) {
     }
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
-      const dice = g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '';
       if (ui.accusing) return '<div class="ask"><div class="who">Final accusation</div><div class="muted">Choose a suspect, a weapon and a room in your notes. If you are wrong, you are out.</div></div>';
-      if (g.phase === 'roll' && g.again) return '<div class="ask"><div class="who">Call again</div><div class="muted">Nobody could show a card. Roll the dice and leave the room to call again, or make your final accusation.</div></div>';
-      if (g.phase === 'roll' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Roll the dice.</div></div>';
-      if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
-      if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div>' + dice + '<div class="muted">You rolled ' + (g.dice[0] + g.dice[1]) + '. Tap where you want to go.</div></div>';
+      if (g.phase === 'move' && g.again) return '<div class="ask"><div class="who">Call again</div><div class="muted">Nobody could show a card. Pick a card and leave the room to call again, or make your final accusation.</div></div>';
+      if (g.phase === 'move' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Suggest here, or pick a card to move on.</div></div>';
+      if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (E.tired(g, uid) ? 'You are tired. Move 2 spaces, or Deduce to refill' : 'Pick Sprint, Jog or Walk to see where you can go') + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
       if (full() && g.phase === 'suggest') return '<div class="ask"><div class="muted">You are in the</div><div class="who">' + esc(D.CARDS[hereCard()]) + '</div><div class="muted">Choose a suspect and a weapon in your notes</div></div>';
       if (g.phase === 'end' && !ui.accusing) return '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
       return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>';
@@ -566,8 +581,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
     let h = g.phase === 'end' && !g.nosug ? lastResultHtml(D, false) : '';
     const hereK = full() ? B.roomOf(g.pos[g.turn]) : -1;
     h += '<div class="ask"><div class="muted">' + (g.phase === 'end' ? 'Waiting for' : 'Turn') + '</div><div class="who">' + esc(nmFull(g.turn)) + '</div>' +
-      (g.phase === 'move' && g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '') + '<div class="muted">' +
-      (g.phase === 'end' ? 'to end their turn' : g.phase === 'roll' ? (g.again ? 'got no answer, and must roll and leave the room to call again' : 'is about to roll the dice') : g.phase === 'move' ? 'rolled ' + (g.dice[0] + g.dice[1]) + ' and is moving'
+      '<div class="muted">' +
+      (g.phase === 'end' ? 'to end their turn' : g.phase === 'move' ? (g.again ? 'got no answer, and must leave the room to call again' : 'is choosing how fast to go')
         : hereK >= 0 ? 'is in the ' + esc(D.CARDS[g.rc0 + hereK]) + ', choosing a suggestion' : 'is choosing a suggestion') + '</div></div>';
     if (E.isOut(g, me)) h += '<p class="muted center">Your accusation was wrong, so you are out. You still show cards when asked.</p>';
     return h;
@@ -639,6 +654,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
     let t = '<section class="card"><h2>Turns</h2><table class="tt"><thead><tr><th>#</th><th>By</th><th>Suspect</th><th>Weapon</th><th>Room</th><th>Showed</th></tr></thead><tbody>';
     for (let n = log.length - 1; n >= 0; n--) {
       const e = log[n], sh = myShown && myShown[n];
+      if (e.t === 'd') { t += '<tr class="r"><td class="n">' + (n + 1) + '</td><td>' + tag(e.by) + '</td><td colspan="4"><div class="dd">' + E.deduceHtml(esc(nm(e.by)), e.add) + '</div></td></tr>'; continue; }
       const cell = (c) => '<td>' + cardHtml(D, c) + (e.t === 's' && sh && sh.card === c ? '&nbsp;👁️' : '') + '</td>';
       let ans, note = '';
       if (e.t === 'a') ans = '<span class="muted">Accused ' + (e.ok ? '✓' : '✗') + '</span>';
@@ -681,6 +697,10 @@ export function startApp({ net, doc, win, delays, load3d }) {
       if (i < 0) return '';
       const e = log[i];
       P = { key: sk + ':' + i, kind: e.t, live: false, e, i, by: e.by, cards: e.cards, list: e.t === 's' ? (e.resp || []).map((r) => r.p) : [e.by] };
+    }
+    if (P.kind === 'd') {                                   // Deduce: skipped the turn to refill
+      ui.holdWant = true;
+      return '<div class="deduce">' + E.deduceHtml(esc(nm(P.by)), P.e.add) + '</div><button class="btn" data-act="next">' + (P.by === uid ? 'OK' : 'Next turn') + '</button>';
     }
     // one stage per player who is asked; the last one ends with the outcome ("Showed" / "Passed") on the same player
     const lastR = P.live ? null : (P.e.resp || [])[P.list.length - 1];
@@ -758,13 +778,14 @@ export function startApp({ net, doc, win, delays, load3d }) {
   // The mansion, for the full game.
   function boardState(D) {
     const g = game, ord = order();
-    const go = g.phase === 'move' && g.turn === uid && g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null;
+    if (!(g.phase === 'move' && g.turn === uid)) ui.card = null;
+    const go = ui.card ? E.reachWith(g, uid, ui.card) : null;
     const roomNames = Array.from({ length: B.ROOMS }, (_, k) => D.CARDS[g.rc0 + k]);
-    return { pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go, dice: g.dice || null, phase: g.phase };
+    return { pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go, mv: g.mv || null, phase: g.phase };
   }
   function legendHtml(D) {
     const g = game, ord = order();
-    return '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div>';
+    return '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em>' + (g.cards && g.cards[p] ? ' <b class="cc" title="Sprint · Jog · Walk left">' + (E.tired(g, p) ? 'tired' : g.cards[p].s + '·' + g.cards[p].j + '·' + g.cards[p].w) + '</b>' : '') + '</span>').join('') + '</div>';
   }
   function boardHtml(D) {
     const g = game;
@@ -804,9 +825,18 @@ export function startApp({ net, doc, win, delays, load3d }) {
   const ICON_NOTES = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 3h8l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12h6M10 16h6M10 8h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const ICON_TURNS = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   // Round buttons bottom right, sitting just above the move buttons (they share one fixed column).
+  // Sprint / Jog / Walk, bottom left: they only show where I can go; the card is spent when I pick the square.
+  function stamHtml() {
+    const g = game;
+    if (!hasMap() || g.over || !g.cards || !g.cards[uid] || E.isOut(g, uid)) return '';
+    const c = E.cardsOf(g, uid), mine = g.turn === uid && g.phase === 'move', tir = E.tired(g, uid);
+    const btn = (k, n, tag) => '<button class="stam k-' + k + (mine && ui.card === k ? ' on' : '') + (n ? '' : ' zero') + '" data-act="card" data-k="' + k + '"' + (mine && n ? '' : ' disabled') + ' aria-pressed="' + (mine && ui.card === k ? 'true' : 'false') +
+      '" aria-label="' + E.CARD_NAMES[k] + ', ' + tag + ', up to ' + E.STEPS[k] + ' spaces">' + E.CARD_NAMES[k] + ' <b>' + tag + '</b></button>';
+    return '<div class="stams" role="group" aria-label="Your stamina">' + (tir ? btn('f', 1, '2') : ['s', 'j', 'w'].map((k) => btn(k, c[k], String(c[k]))).join('')) + '</div>';
+  }
   function hudHtml(D) {
     const notes = notesHtml(D) ? '<button class="fab' + (ui.sheet === 'notes' ? ' on' : '') + '" data-act="sheet" data-s="notes" aria-label="Your notes">' + ICON_NOTES + '</button>' : '';
-    return '<div class="hud"><div class="fabs"><button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div>' + floatHtml(D) + '</div>';
+    return '<div class="hud"><div class="hrow">' + stamHtml() + '<div class="fabs"><button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div></div>' + floatHtml(D) + '</div>';
   }
   function sheetHtml(D) {
     if (!ui.sheet) return '';
@@ -909,7 +939,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
       case 'create': try { msg = ''; needName(); ui.choosing = true; } catch (err) { msg = err.message; } render(); break;
       case 'mk': run(() => createRoom(el.dataset.m)); break;
       case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), modeOf(el.dataset.m)) : null)); break;
-      case 'roll': run(doRoll); break;
+      case 'card': ui.card = ui.card === el.dataset.k ? null : el.dataset.k; render(); break;
+      case 'deduce': run(doDeduce); break;
       case 'pass': run(doPass); break;
       case 'passage': run(doPassage); break;
       case 'stayin': run(doStayIn); break;

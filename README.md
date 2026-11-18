@@ -64,9 +64,13 @@ npm test
 When you create a room you pick the kind of game (the host can still switch it in the lobby):
 
 - **Fast game** – cards only: take turns making suggestions.
-- **Full game** – an isometric mansion (`clue/board.js`, drawn by `clue/boardview.js`). Roll two dice, walk the
-  corridors, and make a suggestion only in the room you walk into. Corner rooms have secret passages.
-  Pawns in corridors block the way. Bots roll and walk too.
+- **Full game** – an isometric mansion (`clue/board.js`, drawn by `clue/boardview.js`). No dice: every player holds
+  public movement cards, **Stamina & Pace**: 3 Sprint (up to 10 spaces), 5 Jog (6) and 4 Walk (3). Press a card to see
+  where it reaches; it is spent when you tap the square or room. A suggestion can only be made in the room you walk into.
+  Corner rooms have secret passages, which are free. With every card used you are Tired and move 2 spaces a turn.
+  **Deduce** refills (+1 Sprint, +2 Jog, +2 Walk) but costs the whole turn, and is locked until one kind has run out.
+  Pawns in corridors block the way. Bots spend cards and Deduce according to a personality (`PERSONAS` in `clue/engine.js`).
+- **3D game** – the full game with the mansion in 3D (see below).
 
 ## Clues 3D (in progress)
 

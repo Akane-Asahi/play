@@ -57,7 +57,13 @@ function act(c, plan) {
   if (c.q('[data-act=pass]')) return c.click('[data-act=pass]');
   if (c.q('[data-act=next]')) return c.click('[data-act=next]');
   if (c.q('[data-act=end]')) return c.click('[data-act=end]');
-  if (c.q('[data-act=roll]')) return c.click('[data-act=roll]');
+  const cardBtns = c.qa('[data-act=card]').filter((x) => !x.disabled);
+  if (c.q('[data-act=deduce]') && cardBtns.length) {          // my move: Deduce now and then when it is open, else pick a card, then a square
+    if (c.q('[data-act=deduce].open') && Math.random() < 0.3) return c.click('[data-act=deduce]');
+    const on = cardBtns.find((x) => x.classList.contains('on'));
+    if (!on) return c.click(cardBtns[Math.floor(Math.random() * cardBtns.length)]);
+    if (!c.q('[data-act=go]')) return c.q('[data-act=stay]') ? c.click('[data-act=stay]') : c.click(on);
+  }
   if (c.q('[data-act=stay]') || c.q('[data-act=go]')) {
     const go = c.qa('[data-act=go]'), rooms = go.filter((x) => +x.getAttribute('data-d') < 0), from = rooms.length ? rooms : go;
     return c.click(from.length ? from[Math.floor(Math.random() * from.length)] : '[data-act=stay]');
@@ -276,24 +282,25 @@ async function play(db, cs, code, plan, until) {
   assert(!/Your cards/.test(mover.text()), 'no Your cards section');
   console.log('H ok: pop-up waits for Next turn');
 }
-// I: the full game: dice, walking the mansion, suggesting only in the room you are in
+// I: the full game: movement cards, walking the mansion, suggesting only in the room you are in
 {
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2'], ['Sir', 'Dada'], null, 'full');
   let g = db.read('rooms/' + code + '/game');
-  assert(g.mode === 'full' && g.phase === 'roll' && Object.keys(g.pos).length === 4, 'full game starts with a roll');
+  assert(g.mode === 'full' && g.phase === 'move' && Object.keys(g.pos).length === 4 && g.cards[g.turn].s === 3, 'full game starts at the move step with full hands');
   const me = cs.find((c) => c.uid === g.turn);
   assert(me.q('.iso') && me.qa('.iso .pawn').length === 4 && !me.q('[data-act=suggest]'), 'board with four pawns, no suggesting from the corridor');
-  me.click('[data-act=roll]'); await wait(10);
-  g = db.read('rooms/' + code + '/game');
-  assert(g.phase === 'move' && me.qa('.die').length === 2 && me.qa('[data-act=go]').length > 0, 'dice shown and squares to tap');
+  assert(!me.q('.die') && !me.q('[data-act=roll]') && !/dice/i.test(me.text()), 'no dice anywhere');
+  assert(me.qa('[data-act=go]').length === 0, 'nothing glows until a card is picked');
+  me.click('[data-act=card][data-k=s]'); await wait(10);
+  assert(me.qa('[data-act=go]').length > 0 && db.read('rooms/' + code + '/game').cards[me.uid].s === 3, 'a Sprint shows where I can go without spending it');
   assert(!cs.find((c) => c.uid !== g.turn).q('[data-act=go]'), 'only the mover can tap squares');
   const end = await play(db, cs, code);
   await wait(20);
   assert(end.over && cs.every((c) => c.q('.stamp')), 'full game plays to the finale');
   const D = S.makeDeck(S.EDITIONS[0]);
   end.log.filter((e) => e.t === 's').forEach((e) => assert(e.cards[2] >= D.CS[2], 'suggestions name a room'));
-  console.log('I ok: full game with dice and board,', end.log.length, 'log entries');
+  console.log('I ok: full game with cards and board,', end.log.length, 'log entries');
 }
 // J: the host cancels the game; the room is deleted and everyone is told
 {
@@ -354,23 +361,23 @@ async function play(db, cs, code, plan, until) {
   DL = { bot: 0, none: 0, min: 0 };
   console.log('K ok: states last a minimum, names under the cards, bots wait for Next turn');
 }
-// L: when nobody could show a card, the player can roll or make a final accusation
+// L: when nobody could show a card, the player can move or make a final accusation
 {
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
   const g0 = db.read('rooms/' + code + '/game');
   const me = cs.find((c) => c.uid === g0.turn);
-  assert(me.q('[data-act=roll]') && me.q('[data-act=accuse-open]'), 'Final Accusation is always there on your own turn');
+  assert(me.q('[data-act=deduce]') && me.q('[data-act=accuse-open]'), 'Final Accusation is always there on your own turn');
   db.write('rooms/' + code + '/game', { ...g0, again: true }); db.notify(); await wait(20);
   const b = me.q('[data-act=accuse-open]');
-  assert(b && b.textContent === 'Final Accusation' && me.q('[data-act=roll]'), 'roll and Final Accusation are both offered');
+  assert(b && b.textContent === 'Final Accusation' && me.q('[data-act=deduce]') && me.q('[data-act=card]:not([disabled])'), 'cards and Final Accusation are both offered');
   me.click(b); await wait(10);
-  assert(!me.q('[data-act=roll]') && me.q('[data-act=accuse-back]') && me.q('[data-act=accuse]').disabled, 'picking an accusation');
+  assert(!me.q('[data-act=deduce]') && me.q('[data-act=accuse-back]') && me.q('[data-act=accuse]').disabled, 'picking an accusation');
   me.click('[data-act=sheet][data-s=notes]');
   [0, 1, 2].forEach((k) => me.click(me.qa('tr.pk td[data-act=pick][data-k="' + k + '"]')[0]));
   assert(!me.q('[data-act=accuse]').disabled, 'accusation is ready once suspect, weapon and room are picked');
   me.click('[data-act=accuse-back]'); await wait(10);
-  assert(me.q('[data-act=roll]'), 'back to rolling');
+  assert(me.q('[data-act=deduce]'), 'back to the move step');
   console.log('L ok: Final Accusation when nobody could show a card');
 }
 // M: anyone can ask for a final accusation at any time; they are asked when the turn in progress is over
@@ -393,10 +400,10 @@ async function play(db, cs, code, plan, until) {
   const g1 = db.read('rooms/' + code + '/game');
   assert(g1.phase === 'window' && g1.win.q[0] === w.uid, 'the turn is over: the window opens for the requester');
   assert(w.q('[data-act=win-pass]') && w.q('[data-act=accuse-open]'), 'they are asked: accuse or pass');
-  assert(!me.q('.float [data-act=roll]'), 'nobody else can play meanwhile');
+  assert(!me.q('.float [data-act=deduce]'), 'nobody else can play meanwhile');
   w.click('[data-act=win-pass]'); await wait(40);
   const g2 = db.read('rooms/' + code + '/game');
-  assert(g2.phase === 'roll' && !g2.win && !g2.req, 'passing carries on with the next turn');
+  assert(g2.phase === 'move' && !g2.win && !g2.req, 'passing carries on with the next turn');
   console.log('M ok: queued final accusation, prompt, pass');
 }
 // N: error messages can be dismissed with a cross
@@ -468,18 +475,19 @@ async function play(db, cs, code, plan, until) {
   assert(cs[0].q('[data-act=setmode][data-m="3d"].on') && /3D game/.test(cs[1].text()), 'the lobby shows the 3D game');
   cs[0].click('[data-act=start]'); await wait(30);
   let g = db.read('rooms/' + code + '/game');
-  assert(g.mode === 'full' && g.phase === 'roll' && Object.keys(g.pos).length === 4, 'a 3D game is a full game underneath');
+  assert(g.mode === 'full' && g.phase === 'move' && Object.keys(g.pos).length === 4, 'a 3D game is a full game underneath');
   const me = cs.find((c) => c.uid === g.turn);
   assert(me.q('#b3d-host #fake3d') && !me.q('.iso'), 'the 3D view replaces the flat map');
   const first = calls.find((c) => c !== 'reset');
   assert(first && first.order.length === 4 && first.roomNames.length === 9 && first.pos[g.turn] === g.pos[g.turn], 'the view is given the game state');
-  me.click('[data-act=roll]'); await wait(10);
+  me.click('[data-act=card][data-k=j]'); await wait(10);
   const st = calls.filter((c) => c !== 'reset').pop();
-  assert(st.phase === 'move' && st.dice.length === 2 && st.go && st.go.cells.size > 0, 'after a roll the view is told where I can go');
+  assert(st.phase === 'move' && !('dice' in st) && st.go && st.go.cells.size > 0, 'after picking a card the view is told where I can go');
   const dest = st.go.cells.keys().next().value;
   views.get(me.win.document).onMove(dest); await wait(10);            // a tap in 3D
   g = db.read('rooms/' + code + '/game');
-  assert(g.pos[me.uid] === dest && g.phase === 'end', 'a tap in 3D moves like a tap on the flat map');
+  assert(g.pos[me.uid] === dest && g.phase === 'end' && g.cards[me.uid].j === 4 && g.mv.c === 'j', 'a tap in 3D moves like a tap on the flat map, and spends the Jog');
+  assert(calls.filter((c) => c !== 'reset').pop().mv.c === 'j', 'the 3D view is told which card was played');
   assert(me.q('#b3d-host #fake3d'), 'the canvas stays on the page after the screen redraws');
   // no WebGL (or the files do not load): the same room shows the flat map instead
   L3D = async () => { throw new Error('no WebGL'); };
@@ -489,6 +497,56 @@ async function play(db, cs, code, plan, until) {
   assert(b.cs.every((c) => c.q('.iso') && !c.q('#b3d-host')), 'falls back to the flat map');
   L3D = undefined;
   console.log('O ok: 3D game mode');
+}
+// P: Stamina & Pace: public counts, buttons, glow without spending, Deduce lock, refill pop-up, Tired
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const path = 'rooms/' + code + '/game';
+  let g = db.read(path);
+  const me = cs.find((c) => c.uid === g.turn), other = cs.find((c) => c.uid !== g.turn);
+  const lab = (c, k) => c.q('[data-act=card][data-k=' + k + ']').textContent.replace(/\s+/g, ' ').trim();
+  assert.deepEqual(['s', 'j', 'w'].map((k) => lab(me, k)), ['Sprint 3', 'Jog 5', 'Walk 4'], 'three buttons with what is left');
+  assert(!me.q('.stam:disabled') && other.qa('.stam').every((x) => x.disabled), 'only the player on turn can press them');
+  assert(me.q('.legend .cc') && /3·5·4/.test(me.q('.legend').textContent), 'everyone can see the counts');
+  assert(me.q('[data-act=deduce].locked') && /locked/.test(me.q('[data-act=deduce]').textContent), 'Deduce says it is locked');
+  me.click('[data-act=deduce]'); await wait(20);
+  assert(db.read(path).turn === g.turn && db.read(path).phase === 'move', 'a locked Deduce does nothing');
+  me.click('[data-act=card][data-k=w]'); await wait(10);
+  const walkGo = me.qa('[data-act=go]').length;
+  me.click('[data-act=card][data-k=s]'); await wait(10);
+  assert(me.qa('[data-act=go]').length >= walkGo && me.q('.stam.on[data-k=s]'), 'switching card changes the glow');
+  me.click('[data-act=card][data-k=s]'); await wait(10);
+  assert(me.qa('[data-act=go]').length === 0, 'tapping the card again hides it');
+  // Deduce once a kind has run out
+  const mine = { ...g.cards, [me.uid]: { s: 0, j: 2, w: 1 } };
+  db.write(path, { ...g, cards: mine }); db.notify(); await wait(20);
+  assert(me.q('[data-act=deduce].open') && /unlocked/.test(me.q('[data-act=deduce]').textContent), 'Deduce unlocks when a kind is at zero');
+  assert(me.q('.stam.zero[data-k=s]') && me.q('.stam.zero[data-k=s]').disabled, 'a spent kind cannot be pressed');
+  me.click('[data-act=deduce]'); await wait(30);
+  g = db.read(path);
+  assert.deepEqual(g.cards[me.uid], { s: 1, j: 4, w: 3 }, 'refill adds on top');
+  assert(g.turn !== me.uid && g.phase === 'move' && g.log[g.log.length - 1].t === 'd', 'Deduce used the turn');
+  [me, other].forEach((c) => {
+    const m = c.q('.modal');
+    assert(m && m.querySelector('h2') && /will skip this step/.test(m.querySelector('h2').textContent) && /Stamina refilled/.test(m.querySelector('h5').textContent) &&
+      m.querySelector('p').textContent === '1 Sprint, 2 Jog, 2 Walks', 'everyone sees the refill pop-up');
+  });
+  me.click('[data-act=next]'); other.click('[data-act=next]'); await wait(10);
+  assert(!me.q('.modal'), 'closed with a tap');
+  me.click('[data-act=sheet][data-s=turns]'); await wait(10);
+  assert(me.q('.dd h2') && /Stamina refilled/.test(me.q('.dd').textContent), 'the Turns list keeps it');
+  // Tired
+  const t = cs.find((c) => c.uid === db.read(path).turn);
+  db.write(path, { ...db.read(path), cards: { ...db.read(path).cards, [t.uid]: { s: 0, j: 0, w: 0 } } }); db.notify(); await wait(20);
+  assert(t.qa('[data-act=card]').length === 1 && /Tired/.test(t.q('[data-act=card]').textContent) && /tired/.test(t.q('.legend').textContent), 'with nothing left there is one Tired button');
+  t.click('[data-act=card][data-k=f]'); await wait(10);
+  const cells = t.qa('[data-act=go]');
+  assert(cells.length > 0 && cells.length < 30, 'Tired glows a couple of squares');
+  const before = db.read(path).cards[t.uid];
+  t.click(cells[0]); await wait(20);
+  assert.deepEqual(db.read(path).cards[t.uid], before, 'Tired is never spent');
+  console.log('P ok: Stamina & Pace buttons, Deduce, Tired');
 }
 console.log('app tests ok');
 process.exit(0);

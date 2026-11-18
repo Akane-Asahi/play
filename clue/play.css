@@ -134,7 +134,7 @@ main{padding-bottom:150px}
 .finbar .who{font-size:24px;font-weight:800;margin:2px 0 8px}
 .mcard .pills{justify-content:center}
 
-/* full game: kind-of-game buttons, the mansion, dice */
+/* full game: kind-of-game buttons, the mansion */
 .modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
 .mode{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;cursor:pointer}
 .mode b{font-size:15px}
@@ -151,7 +151,6 @@ main{padding-bottom:150px}
 .lg{display:inline-flex;align-items:center;gap:5px}
 .lg i{width:10px;height:10px;border-radius:50%;border:1px solid rgba(255,255,255,.35)}
 .lg.on{color:var(--ink);font-weight:650}
-.dice{display:flex;gap:8px;justify-content:center;margin:6px 0 4px}
 @media (prefers-reduced-motion:reduce){.iso .go{animation:none}}
 .lg em{font-style:normal;opacity:.6;font-size:11px}
 .rnote{text-align:center;font-size:15px;font-weight:600;color:var(--ink);margin:12px 0 0}
@@ -242,10 +241,28 @@ body.fullmap main{padding:0!important;max-width:none}
 .mapfull .legend{padding:10px 12px 0}
 
 /* round buttons above the move buttons */
-.hud{position:fixed;z-index:10;left:0;right:0;bottom:0;max-width:720px;margin:0 auto;display:flex;flex-direction:column;align-items:flex-end;pointer-events:none;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.hud{position:fixed;z-index:10;left:0;right:0;bottom:0;max-width:720px;margin:0 auto;display:flex;flex-direction:column;align-items:stretch;pointer-events:none;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
 .hud>*{pointer-events:auto}
 .hud .float{position:static;width:calc(100% - 24px);max-width:none;margin:0 12px;left:auto;right:auto;bottom:auto}
-.fabs{display:flex;flex-direction:column;gap:10px;margin:0 14px 12px 0}
+.hrow{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:0 14px 12px}
+.fabs{display:flex;flex-direction:column;gap:10px;margin:0 0 0 auto}
+.stams{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.stam{min-width:104px;padding:10px 14px;border-radius:999px;border:1px solid rgba(215,178,92,.45);background:#262019;color:#e8d9b5;font:700 14px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.55);transition:transform .12s,background .12s}
+.stam b{font-size:15px;min-width:1.2em;text-align:right}
+.stam.k-s{border-color:#e0674a}.stam.k-j{border-color:#e2b24f}.stam.k-w{border-color:#6fbf8b}.stam.k-f{border-color:#9a8f7c}
+.stam.on{background:#ffd87a;color:#1a1410;transform:translateX(4px);box-shadow:0 0 0 3px rgba(255,216,122,.35),0 8px 22px rgba(0,0,0,.55)}
+.stam:disabled{opacity:.55;cursor:default;box-shadow:none}
+.stam.zero:disabled{opacity:.3}
+.dbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.dbtn em{font-style:normal;font-weight:600;font-size:12px;opacity:.75}
+.dbtn.locked{background:#3a332a;color:#a99c86;border:1px dashed rgba(215,178,92,.35)}
+.dbtn.open{background:#d7b25c;color:#1a1410}
+.lg .cc{font-weight:700;font-size:11px;color:#e8d9b5;background:rgba(255,255,255,.08);border-radius:8px;padding:1px 6px}
+.deduce{text-align:center;padding:6px 4px 10px}
+.deduce h2{margin:0 0 8px;font-size:22px}
+.deduce h5{margin:0 0 6px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#d7b25c}
+.deduce p{margin:0;font-size:17px;font-weight:650}
+.dd h2{font-size:14px;margin:0}.dd h5{font-size:11px;margin:2px 0;color:#d7b25c;text-transform:uppercase;letter-spacing:.06em}.dd p{margin:0;font-size:13px}
 .fab{width:50px;height:50px;border-radius:50%;border:1px solid rgba(215,178,92,.45);background:#262019;color:#e8d9b5;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.55)}
 .fab.on{background:#d7b25c;color:#1a1410;border-color:#d7b25c}
 

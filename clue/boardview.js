@@ -160,11 +160,3 @@ export function boardSvg(o) {
     });
   return s + '</svg>';
 }
-
-// One die face.
-export function dieSvg(n) {
-  const at = { 1: [[12, 12]], 2: [[6, 6], [18, 18]], 3: [[6, 6], [12, 12], [18, 18]], 4: [[6, 6], [18, 6], [6, 18], [18, 18]],
-    5: [[6, 6], [18, 6], [12, 12], [6, 18], [18, 18]], 6: [[6, 5], [18, 5], [6, 12], [18, 12], [6, 19], [18, 19]] }[n] || [];
-  return '<svg class="die" viewBox="0 0 24 24" width="30" height="30" role="img" aria-label="' + n + '"><rect x="1" y="1" width="22" height="22" rx="5" fill="#f4eee2" stroke="#b59a5b"/>' +
-    at.map((p) => '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="2.2" fill="#241b0d"/>').join('') + '</svg>';
-}

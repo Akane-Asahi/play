@@ -3,8 +3,8 @@
 A 3D version of the full Clue game with a toy-diorama look: chibi pawns, flat bright colours, toon shading
 and a fixed high camera. It runs the same rules as `../clue` (`engine.js`, `board.js`), drawn with three.js.
 
-- **3D game mode (the real game):** in `/clue/`, create a room and choose **3D game**. Same rules and room as the full game; the 3D board replaces the flat map, and the existing screens (roll, suggest, answer, notes, accusation) sit over it. Taps on glowing squares and rooms go through the same move as the flat map. If WebGL is missing the room shows the flat map.
-- **Play the sandbox:** `/Clue3D/` (e.g. `https://akane-asahi.github.io/play/Clue3D/`). You are Scarlett against two bots: roll, walk, enter rooms, take secret passages. Suggestions, cards and online rooms come next.
+- **3D game mode (the real game):** in `/clue/`, create a room and choose **3D game**. Same rules and room as the full game; the 3D board replaces the flat map, and the existing screens (cards, suggest, answer, notes, accusation) sit over it. Taps on glowing squares and rooms go through the same move as the flat map. If WebGL is missing the room shows the flat map.
+- **Play the sandbox:** `/Clue3D/` (e.g. `https://akane-asahi.github.io/play/Clue3D/`). You are Scarlett against two bots: pick Sprint, Jog or Walk, tap where to go, take secret passages, Deduce to refill. Suggestions, cards and online rooms come next.
 - **Task board:** `/Clue3D/tasks.html`. Drag cards between To do, In progress and Done.
 
 ## Run it
@@ -21,7 +21,7 @@ Serve the repo root with any static server and open `/Clue3D/`.
 - `js/look.js`: the palette and toon materials (everything goes through here)
 - `js/board3d.js`: the mansion built from `../clue/board.js`, room stand-in furniture, reach highlights, picking
 - `js/pawns.js`: chibi stand-in pawns, turn marker, swapping in suspect models
-- `js/dice.js`: dice that tumble and land on the rolled values
+- `js/fx.js`: the Sprint dash (flashing light on the pawn's back) and the smoke puff that fades over 3 seconds
 - `js/anim.js`: tweens, hop with squash and stretch
 - `js/path.js`: the squares a pawn walks through (tested in `../test/clue3d.test.js`)
 - `js/assets.js`, `models/`: loading generated GLB models; see `models/README.md` for the model rules

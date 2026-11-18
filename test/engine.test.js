@@ -34,58 +34,125 @@ const S = loadSolver();
   assert.equal(E.suggest(g, 'a', [0, 6, 12], order), undefined);
 }
 
-// full game: rolling, moving, rooms and passages
+// full game: cards, moving, rooms, passages, Deduce
 {
   const B = await import('../clue/board.js');
   const order = ['a', 'b', 'c'];
-  let g = E.newGame(order, { mode: 'full', rc0: 12 });
+  const fresh = () => E.newGame(order, { mode: 'full', rc0: 12 });
+  let g = fresh();
+  assert(g.phase === 'move' && !('dice' in g), 'a turn starts at the move step, no dice');
+  assert.deepEqual(g.cards.a, { s: 3, j: 5, w: 4 }); assert.deepEqual(g.cards.c, { s: 3, j: 5, w: 4 });
+  assert.equal(E.roll, undefined, 'dice are gone');
   assert.equal(E.suggest(g, 'a', [0, 6, 12], order), undefined, 'cannot suggest before moving');
-  assert.equal(E.roll(g, 'b', [3, 4]), undefined); assert.equal(E.roll(g, 'a', [7, 1]), undefined);
-  g = E.roll(g, 'a', [1, 1]);
-  assert.equal(E.move(g, 'a', B.inRoom(4)), undefined, 'the middle room is too far for a 2');
-  g = E.move(g, 'a', B.inRoom(0));
-  assert.equal(g.phase, 'suggest');
+  assert.equal(E.move(g, 'b', B.inRoom(0), 'w'), undefined, 'not your turn');
+  assert.equal(E.move(g, 'a', B.inRoom(4), 'w'), undefined, 'the middle room is too far for a Walk');
+  assert.equal(E.move(g, 'a', B.inRoom(0), 'x'), undefined, 'no such card');
+  assert.equal(E.move(g, 'a', B.inRoom(0)), undefined, 'a card has to be named');
+  assert.equal(E.move(g, 'a', B.inRoom(0), 'f'), undefined, 'Tired only when every card is gone');
+  assert.equal(E.reachWith(g, 'a', 'f'), null);
+  assert(E.reachWith(g, 'a', 's').rooms[4] != null || Object.keys(E.reachWith(g, 'a', 's').rooms).length > 0, 'a Sprint reaches rooms');
+  assert(Object.keys(E.reachWith(g, 'a', 's').rooms).length >= Object.keys(E.reachWith(g, 'a', 'w').rooms).length, 'a bigger card never reaches less');
+  assert(!E.canDeduce(g, 'a') && E.deduce(g, 'a', order) === undefined, 'Deduce is locked while every kind has a card');
+  g = E.move(g, 'a', B.inRoom(0), 'j');
+  assert.equal(g.phase, 'suggest'); assert.deepEqual(g.cards.a, { s: 3, j: 4, w: 4 }, 'only the card played is spent, and only on arrival');
+  assert(g.mv.p === 'a' && g.mv.c === 'j' && g.mv.n === 1);
+  assert.deepEqual(g.cards.b, { s: 3, j: 5, w: 4 }, 'other hands untouched');
   assert.equal(E.suggest(g, 'a', [0, 6, 13], order), undefined, 'only the room you are in');
   g = E.suggest(g, 'a', [0, 6, 12], order);
+  assert(!g.mv, 'a suggestion clears the move note');
   g = E.answer(g, 'b', 'showed');
   g = E.endTurn(g, 'a', order);
-  assert(g.phase === 'roll' && g.turn === 'b' && !g.dice);
-  g = E.move(E.roll(g, 'b', [1, 2]), 'b', 'stay');
-  assert(g.phase === 'end' && g.nosug);
-  g = E.endTurn(E.move(E.roll(E.endTurn(g, 'b', order), 'c', [6, 6]), 'c', 'stay'), 'c', order);
+  assert(g.phase === 'move' && g.turn === 'b');
+  g = E.move(g, 'b', 'stay');
+  assert(g.phase === 'end' && g.nosug && g.cards.b.w === 4, 'staying put costs nothing');
+  g = E.endTurn(E.move(E.endTurn(g, 'b', order), 'c', 'stay'), 'c', order);
   g = E.passage(g, 'a');
-  assert(g.phase === 'suggest' && g.pos.a === B.inRoom(8), 'kitchen passage leads to the study');
+  assert(g.phase === 'suggest' && g.pos.a === B.inRoom(8) && g.mv.c === 'p', 'kitchen passage leads to the study, free');
+  assert.deepEqual(g.cards.a, { s: 3, j: 4, w: 4 }, 'a passage costs no card');
   // a named suspect's player is brought into the room and may suggest there next turn
   g = E.suggest(g, 'a', [1, 6, 20], order);                 // suspect 1 is seat 1: player b
   assert(g.pos.b === g.pos.a && g.called.b, 'b is moved into the study');
   g = E.endTurn(E.answer(g, 'b', 'showed'), 'a', order);
   assert.equal(E.stayIn(g, 'a'), undefined);
   const stay = E.stayIn(g, 'b');
-  assert(stay.phase === 'suggest' && !stay.called, 'called player suggests without rolling');
-  assert(!E.roll(g, 'b', [2, 2]).called, 'rolling gives the chance up');
+  assert(stay.phase === 'suggest' && !stay.called, 'called player suggests without moving');
+  const away = Number(Object.keys(E.reachWith(g, 'b', 's').rooms)[0]);
+  assert(!E.move(g, 'b', B.inRoom(away), 's').called, 'moving gives the chance up');
   assert(!E.suggest(stay, 'b', [0, 7, 20], order).called, 'no call when already in the room');
   // nobody could show a card: the suggester calls again, but has to leave the room first
   {
-    let h = E.roll(E.newGame(order, { mode: 'full', rc0: 12 }), 'a', [1, 1]);
-    h = E.suggest(E.move(h, 'a', B.inRoom(0)), 'a', [0, 6, 12], order);
+    let h = E.move(fresh(), 'a', B.inRoom(0), 'j');
+    h = E.suggest(h, 'a', [0, 6, 12], order);
     h = E.answer(E.answer(h, 'b', 'none'), 'c', 'none');
-    assert(h.phase === 'roll' && h.again && h.turn === 'a', 'no answer: roll again');
+    assert(h.phase === 'move' && h.again && h.turn === 'a', 'no answer: move again');
     assert.equal(E.stayIn(h, 'a'), undefined);
-    assert(E.accuse(h, 'a', [0, 6, 12]), 'a final accusation is allowed instead of rolling');
-    h = E.roll(h, 'a', [1, 1]);
-    assert(h.phase === 'move' && h.again);
+    assert(E.accuse(h, 'a', [0, 6, 12]), 'a final accusation is allowed instead of moving');
     assert.equal(E.move(h, 'a', 'stay'), undefined, 'must leave the room');
-    const out = [...B.reach(h.pos, 'a', 2).cells.keys()][0];
-    const moved = E.move(h, 'a', out);
+    assert.equal(E.deduce(h, 'a', order), undefined, 'and Deduce is locked here anyway');
+    const out = [...E.reachWith(h, 'a', 'w').cells.keys()][0];
+    const moved = E.move(h, 'a', out, 'w');
     assert(moved.phase === 'end' && !moved.again, 'out in the corridor, call again later');
-    const viaDoor = E.move(E.roll(E.passage ? { ...h, phase: 'roll' } : h, 'a', [6, 6]), 'a', B.inRoom(1));
+    const viaDoor = E.move(h, 'a', B.inRoom(1), 's');
     assert(viaDoor && viaDoor.phase === 'suggest' && !viaDoor.again, 'into another room: call again');
-    const p2 = E.passage({ ...h, phase: 'roll' }, 'a');
+    const p2 = E.passage(h, 'a');
     assert(p2 && p2.phase === 'suggest' && !p2.again, 'the secret passage is a way out too');
     // a suggestion someone answered does not give another call
-    let k = E.roll(E.newGame(order, { mode: 'full', rc0: 12 }), 'a', [1, 1]);
-    k = E.answer(E.suggest(E.move(k, 'a', B.inRoom(0)), 'a', [0, 6, 12], order), 'b', 'showed');
+    let k = E.answer(E.suggest(E.move(fresh(), 'a', B.inRoom(0), 'j'), 'a', [0, 6, 12], order), 'b', 'showed');
     assert(k.phase === 'end' && !k.again);
+  }
+  // counts fall to zero, then Tired (2 spaces), then Deduce gives it all back
+  {
+    let h = fresh();
+    h.cards.a = { s: 0, j: 2, w: 1 };
+    assert(E.canDeduce(h, 'a') && E.playable(h, 'a').join() === 'j,w' && !E.tired(h, 'a'), 'one kind at zero unlocks Deduce');
+    assert.equal(E.move(h, 'a', B.inRoom(0), 's'), undefined, 'no Sprint left');
+    h.cards.a = { s: 0, j: 0, w: 0 };
+    assert(E.tired(h, 'a') && E.playable(h, 'a').join() === 'f');
+    assert.equal(E.move(h, 'a', B.inRoom(0), 'w'), undefined);
+    const two = [...E.reachWith(h, 'a', 'f').cells.entries()];
+    assert(two.length && two.every(([, d]) => d <= 2), 'Tired is two spaces');
+    const t = E.move(h, 'a', two[0][0], 'f');
+    assert(t && t.phase === 'end' && t.cards.a.s === 0 && t.cards.a.j === 0 && t.cards.a.w === 0 && t.mv.c === 'f', 'Tired never runs out');
+    // Deduce
+    h.cards.a = { s: 0, j: 3, w: 4 };
+    const d = E.deduce(h, 'a', order);
+    assert(d && d.turn === 'b' && d.phase === 'move', 'Deduce ends the turn: no move, no suggestion');
+    assert.deepEqual(d.cards.a, { s: 1, j: 5, w: 6 }, 'refill adds 1 Sprint, 2 Jog, 2 Walk on top of what is left');
+    assert.deepEqual(d.log[d.log.length - 1], { t: 'd', by: 'a', add: { s: 1, j: 2, w: 2 } });
+    assert.equal(d.pos.a, h.pos.a, 'Deduce does not move you');
+    assert(!d.nosug && !d.mv);
+    h.cards.a = { s: 0, j: 0, w: 0 };
+    assert.deepEqual(E.deduce(h, 'a', order).cards.a, { s: 1, j: 2, w: 2 }, 'from empty');
+    h.cards.a = { s: 9, j: 9, w: 9 };
+    assert.equal(E.deduce(h, 'a', order), undefined, 'locked with plenty');
+    assert.equal(E.deduce({ ...h, cards: { ...h.cards, a: { s: 0, j: 1, w: 1 } }, phase: 'suggest' }, 'a', order), undefined, 'only at the start of the turn');
+    assert.equal(E.deduce({ ...h, cards: { ...h.cards, a: { s: 0, j: 1, w: 1 } } }, 'b', order), undefined, 'only on your own turn');
+    assert.equal(E.deduceHtml('Sir', { s: 1, j: 2, w: 2 }), '<h2>Sir will skip this step</h2><h5>Stamina refilled</h5><p>1 Sprint, 2 Jog, 2 Walks</p>');
+  }
+  // bots: every choice they make is a legal move
+  {
+    const rng = S.mulberry32(7);
+    for (let i = 0; i < 400; i++) {
+      const pid = order[i % 3], h0 = fresh();
+      h0.cards[pid] = { s: Math.floor(rng() * 3), j: Math.floor(rng() * 3), w: Math.floor(rng() * 3) };
+      if (rng() < 0.2) h0.cards[pid] = { s: 0, j: 0, w: 0 };
+      h0.turn = pid;
+      h0.pos[pid] = rng() < 0.5 ? B.inRoom(Math.floor(rng() * 9)) : B.STARTS[i % 6];
+      if (rng() < 0.2) h0.again = true;
+      const goal = Math.floor(rng() * 10) - 1, p = E.PERSONAS[i % E.PERSONAS.length];
+      const a = E.botTurn(h0, pid, goal, rng, p);
+      const nx = a.act === 'move' ? E.move(h0, pid, a.dest, a.card) : a.act === 'passage' ? E.passage(h0, pid) : a.act === 'deduce' ? E.deduce(h0, pid, order)
+        : a.act === 'stay' ? (h0.called && h0.called[pid] ? E.stayIn(h0, pid) || E.move(h0, pid, 'stay') : E.move(h0, pid, 'stay')) : null;
+      assert(nx, 'bot chose a legal action: ' + JSON.stringify(a) + ' ' + JSON.stringify(h0.cards[pid]) + ' at ' + h0.pos[pid] + (h0.again ? ' again' : ''));
+    }
+    // a bot with nothing left deduces (it can't reach a room with 2 steps), and a Sneak does not crawl at a far room
+    const far = fresh(); far.cards.a = { s: 0, j: 0, w: 0 }; far.pos.a = B.STARTS[3];
+    assert.equal(E.botTurn(far, 'a', 0, S.mulberry32(1), E.PERSONAS[0]).act, 'deduce', 'out of cards: Deduce');
+    const sneak = fresh(); sneak.cards.a = { s: 0, j: 5, w: 4 }; sneak.pos.a = B.STARTS[3];
+    assert(!['s', 'j', 'w'].some((k) => E.reachWith(sneak, 'a', k) && E.reachWith(sneak, 'a', k).rooms[0] != null), 'the study room is out of reach from there');
+    let dd = 0; for (let i = 0; i < 100; i++) if (E.botTurn(sneak, 'a', 0, S.mulberry32(i), E.PERSONAS[2]).act === 'deduce') dd++;
+    let dr = 0; for (let i = 0; i < 100; i++) if (E.botTurn(sneak, 'a', 0, S.mulberry32(i), E.PERSONAS[4]).act === 'deduce') dr++;
+    assert(dd > 60 && dr < 40 && dd > dr, 'sneaks Deduce more than rushers when the room is too far: ' + dd + ' vs ' + dr);
   }
   // a pawn in a corridor blocks the square
   const r = B.reach({ a: B.idx(4, 0), b: B.idx(4, 1), c: B.idx(5, 0) }, 'a', 6);
@@ -140,14 +207,14 @@ console.log('engine tests ok:', games, 'bot games, avg', Math.round(turns / game
   assert(g.req.b && !E.requestAccuse(g, 'b', order), 'b is queued once');
   g = E.requestAccuse(g, 'c', order);
   let h = E.endTurn(g, 'a', order);
-  assert(h.phase === 'window' && h.turn === 'b' && h.win.q.join() === 'b,c' && h.win.phase === 'roll', 'turn over: window opens in seat order');
+  assert(h.phase === 'window' && h.turn === 'b' && h.win.q.join() === 'b,c' && h.win.phase === 'move', 'turn over: window opens in seat order');
   assert.equal(E.windowWho(h), 'b');
   assert.equal(E.accuse(h, 'c', env), undefined, 'only the prompted player can accuse');
   assert.equal(E.accuse(h, 'a', env), undefined, 'and not someone whose turn is over');
   const p = E.windowPass(h, 'b', order);
   assert(p.phase === 'window' && p.win.q.join() === 'c' && !p.req.b, 'pass moves on to the next requester');
   const q = E.windowPass(p, 'c', order);
-  assert(q.phase === 'roll' && q.turn === 'b' && !q.win && !q.req, 'last pass starts the next turn');
+  assert(q.phase === 'move' && q.turn === 'b' && !q.win && !q.req, 'last pass starts the next turn');
   // wrong accusation inside the window: out, next requester is asked, then play carries on
   const acc = E.accuse(h, 'b', [1, 8, 15]);
   assert(acc.phase === 'accusing' && acc.win && !acc.req.b, 'accusing keeps the window');
@@ -159,9 +226,9 @@ console.log('engine tests ok:', games, 'bot games, avg', Math.round(turns / game
   const only = { phase: 'end', turn: 'a', mode: 'full', log: [], req: { b: true } };
   const w2 = E.endTurn(only, 'a', order);
   const x = E.resolveAccuse(E.accuse(w2, 'b', [1, 8, 15]), env, order);
-  assert(x.out.b && x.phase === 'roll' && x.turn === 'c' && !x.win, 'b was next to play and is out: c plays');
+  assert(x.out.b && x.phase === 'move' && x.turn === 'c' && !x.win, 'b was next to play and is out: c plays');
   // cancelling the only request while the window is open closes it
   const cc = E.cancelRequest(w2, 'b', order);
-  assert(cc.phase === 'roll' && cc.turn === 'b' && !cc.win, 'cancel closes an empty window');
+  assert(cc.phase === 'move' && cc.turn === 'b' && !cc.win, 'cancel closes an empty window');
   console.log('Final accusation queue ok');
 }

@@ -4,7 +4,7 @@
 //
 //   const view = createBoardView({ doc, win, onMove });   // throws when WebGL is not available
 //   host.appendChild(view.el);
-//   view.update({ pos, order, me, turn, out, roomNames, go, dice, phase });
+//   view.update({ pos, order, me, turn, out, roomNames, go, mv, phase });   // mv: { p, c }: who moved last, with which card
 //   view.reset();                                          // a new game started
 import * as THREE from 'three';
 import * as B from '../../clue/board.js';
@@ -12,8 +12,8 @@ import { SEAT_COLORS } from '../../clue/boardview.js';
 import { createStage } from './scene.js';
 import { buildBoard, standAt, ROOM_NAMES } from './board3d.js';
 import { makePawn, addMeMarker, makeTurnMarker, bobMarker, gasp, setPawnModel, SUSPECTS } from './pawns.js';
-import { makeDice } from './dice.js';
-import { step, hop, tween, wait, ease } from './anim.js';
+import { makeFx } from './fx.js';
+import { step, hop, tween, ease } from './anim.js';
 import { walkPath } from './path.js';
 import { loadManifest, loadModels } from './assets.js';
 
@@ -33,13 +33,13 @@ export function createBoardView({ doc, win, onMove }) {
   const stage = createStage(canvas);
   const { scene, camera, controls, renderer } = stage;
   const board = buildBoard(scene);
-  const dice = makeDice(scene);
+  const fx = makeFx(scene);
   const marker = makeTurnMarker();
   scene.add(marker);
 
   const pawns = new Map();            // pid -> { obj, seat, target, shown, chain }
   const models = { suspects: {} };    // loaded suspect models by seat, for pawns created later
-  let cur = null, namesKey = '', diceKey = null, fresh = true;
+  let cur = null, namesKey = '';
 
   // ---- models (optional): same manifest as the sandbox; empty slots keep the stand-ins ----
   loadManifest(MODELS).then((m) => loadModels(m, (kind, name, obj) => {
@@ -75,38 +75,35 @@ export function createBoardView({ doc, win, onMove }) {
     p.obj.scale.setScalar(1);
     await gasp(p.obj);
   }
+  // How a pawn gets there depends on the card played: a Sprint dashes (flashing light, then smoke), a Jog hops quickly,
+  // a Walk hops steadily, Tired drags its feet, a secret passage goes down one hatch and up the other, and anything
+  // else (called into a room by a suggestion) pops in.
+  const HOP = { j: [130, 0.38], w: [210, 0.5], f: [300, 0.3] };
   async function travel(pid, p, from, to, st) {
-    const fromRoom = B.roomOf(from), toRoom = B.roomOf(to);
-    const mover = pid === st.turn;
-    const walk = mover ? walkPath({ ...shownMap(), [pid]: from }, pid, to) : [];
-    const sum = st.dice ? st.dice[0] + st.dice[1] : 0;
-    const passage = mover && fromRoom >= 0 && toRoom >= 0 && B.PASSAGE[fromRoom] === toRoom && (!st.dice || !walk.length || walk.length > sum);
-    if (walk.length && !passage) {
+    const kind = st.mv && st.mv.p === pid ? st.mv.c : null;
+    const walk = kind && kind !== 'p' ? walkPath({ ...shownMap(), [pid]: from }, pid, to) : [];
+    if (walk.length && kind === 's') {
+      const pts = [p.obj.position.clone(), ...walk.map((v) => standAt(v, p.seat))];
+      await fx.dash(p.obj, pts, Math.max(420, Math.min(950, 260 + walk.length * 60)));
+      p.shown = to;
+      fx.smoke(standAt(to, p.seat));                                  // not awaited: it fades while play carries on
+      return;
+    }
+    if (walk.length) {
+      const [t, h] = HOP[kind] || HOP.w;
       let at = p.obj.position.clone();
       for (const v of walk) {
         const next = standAt(v, p.seat), room = B.roomOf(v) >= 0;
-        await hop(p.obj, at, next, room ? 320 : 190, room ? 0.9 : 0.5);
+        await hop(p.obj, at, next, room ? t * 1.5 : t, room ? h * 1.8 : h);
         at = next;
       }
-    } else if (passage) {
+    } else if (kind === 'p') {
       await tween(260, (k) => { p.obj.scale.setScalar(Math.max(0.001, 1 - k)); });   // down one hatch, up the other
       p.obj.position.copy(standAt(to, p.seat));
       await tween(300, (k) => { p.obj.scale.setScalar(Math.max(0.001, k)); }, ease.outBack);
       p.obj.scale.setScalar(1);
     } else await pop(p, to);
     p.shown = to;
-  }
-
-  // ---- dice ----
-  async function syncDice(st) {
-    if (st.phase === 'roll' || !st.dice) { diceKey = null; dice.hide(); return; }
-    const key = st.turn + ':' + st.dice.join(',');
-    if (key === diceKey) return;
-    diceKey = key;
-    if (fresh) { dice.setValues(st.dice); return; }          // opened in the middle of a turn: just show them
-    await dice.throwDice(st.dice);
-    await wait(1300);
-    if (diceKey === key) dice.hide();                        // out of the way of the board and the pawns
   }
 
   function update(st) {
@@ -123,15 +120,12 @@ export function createBoardView({ doc, win, onMove }) {
       const out = !!(st.out && st.out[pid]);               // out of the game: lies down
       if (out !== p.out) { p.out = out; p.obj.userData.figure.rotation.z = out ? 1.35 : 0; p.obj.userData.figure.position.y = out ? 0.22 : 0; }
     }
-    syncDice(st);
-    fresh = false;
   }
 
   function reset() {
     pawns.forEach((p) => scene.remove(p.obj));
     pawns.clear();
     board.showReach(null);
-    dice.hide(); diceKey = null; fresh = true;
   }
 
   // ---- tapping a glowing square or room (a tap, not a drag of the camera) ----
