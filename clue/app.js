@@ -202,8 +202,17 @@ export function startApp({ net, doc, win, delays, load3d }) {
   // ---------- my moves ----------
   function resetPick() { ui.sel = [null, null, null]; ui.accusing = false; ui.confirm = false; }
 
+  // Slide the Notes / Turns sheet down and out, then take it away.
+  function closeSheet() {
+    if (!ui.sheet || ui.sheetClosing) return;
+    const sh = doc.querySelector('.sheet'), bd = doc.querySelector('.sbackdrop');
+    if (!sh || !D0.slide) { ui.sheet = null; ui.sheetEnter = false; render(); return; }
+    ui.sheetClosing = true; sh.classList.remove('enter'); sh.classList.add('out'); if (bd) { bd.classList.remove('enter'); bd.classList.add('out'); }
+    win.setTimeout(() => { ui.sheetClosing = false; ui.sheet = null; render(); }, D0.slide + 20);
+  }
   async function doSuggest() {
     if (!sugReady()) return;
+    closeSheet();                                    // the table closes as soon as the suggestion goes out
     const cards = ui.sel.slice(), ord = order();
     resetPick();
     await tx((g) => E.suggest(g, uid, cards, ord));
@@ -849,7 +858,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   function sheetHtml(D) {
     if (!ui.sheet) return '';
     const notes = ui.sheet === 'notes';
-    const en = ui.sheetEnter ? ' enter' : '';
+    const en = ui.sheetClosing ? ' out' : ui.sheetEnter ? ' enter' : '';
     return '<div class="sbackdrop' + en + '" data-act="sheet" data-s=""></div><aside class="sheet' + en + '" role="dialog" aria-label="' + (notes ? 'Your notes' : 'Turns') + '"><button class="x sx" data-act="sheet" data-s="" aria-label="Close">×</button>' +
       '<div class="sbody">' + (notes ? notesHtml(D) : turnsHtml(D)) + '</div></aside>';
   }
@@ -977,13 +986,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       case 'sheet': {
         const want = el.dataset.s && ui.sheet !== el.dataset.s ? el.dataset.s : null;
         if (ui.sheetClosing) break;
-        if (!want && ui.sheet) {                         // slide down and out, then take it away
-          const sh = doc.querySelector('.sheet'), bd = doc.querySelector('.sbackdrop');
-          if (!sh || !D0.slide) { ui.sheet = null; ui.sheetEnter = false; render(); break; }
-          ui.sheetClosing = true; sh.classList.remove('enter'); sh.classList.add('out'); if (bd) { bd.classList.remove('enter'); bd.classList.add('out'); }
-          win.setTimeout(() => { ui.sheetClosing = false; ui.sheet = null; render(); }, D0.slide + 20);
-          break;
-        }
+        if (!want && ui.sheet) { closeSheet(); break; }
         ui.sheetEnter = !ui.sheet && !!want && D0.slide > 0;   // slide up from the bottom only when it was closed
         ui.sheet = want; render();
         if (ui.sheetEnter) win.setTimeout(() => { ui.sheetEnter = false; }, D0.slide + 60);

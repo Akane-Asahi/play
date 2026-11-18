@@ -568,5 +568,25 @@ async function play(db, cs, code, plan, until) {
   DL = { bot: 0, none: 0, min: 0, slide: 0 };
   console.log('Q ok: sheets slide, movement buttons hide');
 }
+// R: Suggest closes the notes table
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const path = 'rooms/' + code + '/game';
+  let g = db.read(path);
+  const me = cs.find((c) => c.uid === g.turn);
+  me.click('[data-act=card][data-k=s]'); await wait(10);
+  const dest = me.qa('[data-act=go]').find((x) => +x.getAttribute('data-d') < 0);
+  assert(dest, 'a room within a Sprint');
+  me.click(dest); await wait(20);
+  assert(db.read(path).phase === 'suggest');
+  me.click('[data-act=sheet][data-s=notes]'); await wait(10);
+  assert(me.q('.sheet'), 'notes open to pick the cards');
+  [0, 1].forEach((k) => { const o = me.qa('[data-act=pick][data-k="' + k + '"]'); me.click(o[0]); });
+  me.click('[data-act=suggest]'); await wait(20);
+  assert(!me.q('.sheet') && !me.q('.sbackdrop'), 'the table is closed once the suggestion is sent');
+  assert(db.read(path).phase === 'answer' || db.read(path).phase === 'end' || db.read(path).log.length === 1, 'and the suggestion went through');
+  console.log('R ok: Suggest closes the table');
+}
 console.log('app tests ok');
 process.exit(0);
