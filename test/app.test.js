@@ -332,7 +332,7 @@ async function play(db, cs, code, plan, until) {
   h2.click('[data-act=pass]'); await wait(300);
   assert.equal(db.read('rooms/' + code + '/game').phase, 'end');
   for (let i = 0; i < 60 && !(host.q('[data-act=next]') && h2.q('[data-act=next]')); i++) await wait(50);
-  assert.equal(h2.q('.mcard .ci.on .cl').textContent, 'Finishing…', 'the result ends on the player finishing the turn');
+  assert.equal(h2.q('.mcard .ci.on .cp').textContent, 'Hosty', 'the result ends on the asker in the white pill'); assert.equal(h2.q('.mcard .ci.on .cl').textContent, '', 'with no state text');
   assert(h2.q('.mcard .fan').compareDocumentPosition(h2.q('.mcard .car')) & 4, 'and names are still under the cards');
   assert.equal(typeof db.read('rooms/' + code + '/players/h2/hold'), 'number', 'Hana is holding the game');
   host.click('[data-act=next]'); host.click('[data-act=end]'); await wait(30);

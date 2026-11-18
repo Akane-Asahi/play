@@ -623,7 +623,7 @@ export function startApp({ net, doc, win, delays }) {
       P = { key: sk + ':' + i, kind: e.t, live: false, e, i, by: e.by, cards: e.cards, list: e.t === 's' ? (e.resp || []).map((r) => r.p) : [e.by] };
     }
     P.stages = P.kind === 's'
-      ? P.list.map((p, k) => ({ i: k, label: 'Showing…' })).concat([{ i: P.list.length, label: 'Finishing…', fin: true }])
+      ? P.list.map((p, k) => ({ i: k, label: 'Showing…' })).concat([{ i: P.list.length, label: '', fin: true }])
       : [{ i: 0, label: 'Accusing…' }, { i: 0, label: 'Wrong', fin: true }];
     const items = P.kind === 's' ? P.list.concat([P.by]) : [P.by];
 
