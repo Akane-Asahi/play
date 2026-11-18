@@ -34,6 +34,8 @@ async function lobby(db, humans, bots, names, mode) {
   for (const h of humans.slice(1)) {
     const c = open(db, h + '-fresh', '?room=' + code); await wait(5);       // not in the room yet: sees the join form
     assert(c.q('#code').value === code, 'code prefilled from the link');
+    assert(!c.q('[data-act=create]') && !c.q('#edition'), 'an invited player cannot start a room');
+    assert(c.q('[data-act=join]').className === 'btn', 'Join room is the gold button');
     const real = open(db, h, '?room=' + code); await wait(5);
     real.type('name', names[h] || 'P-' + h); real.click('[data-act=join]'); await wait(10);
     cs.push(real);

@@ -312,7 +312,14 @@ export function startApp({ net, doc, win, delays }) {
 
   // ---------- screens ----------
   function homeHtml() {
-    return '<section class="card"><h2>Your name</h2><input type="text" id="name" maxlength="20" placeholder="e.g. Telot" autocomplete="nickname" value="' + esc(ui.name) + '"></section>' +
+    const name = '<section class="card"><h2>Your name</h2><input type="text" id="name" maxlength="20" placeholder="e.g. Telot" autocomplete="nickname" value="' + esc(ui.name) + '"></section>';
+    // Opened from a friend's link: just a name and Join room, no starting a room of your own.
+    if (ui.invited) {
+      return name + '<section class="card"><h2>Join a room</h2><p class="muted">You were invited. Type your name, then join.</p>' +
+        '<input type="text" id="code" maxlength="5" placeholder="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
+        '<button class="btn" data-act="join">Join room</button></section>';
+    }
+    return name +
       '<section class="card"><h2>Start a room</h2><select id="edition">' +
       S.EDITIONS.map((e) => '<option value="' + esc(e.id) + '"' + (e.id === ui.edition ? ' selected' : '') + '>' + esc(e.name) + '</option>').join('') +
       '</select>' + (ui.choosing
@@ -863,7 +870,7 @@ export function startApp({ net, doc, win, delays }) {
   async function boot() {
     let fromUrl = null;
     try { fromUrl = new win.URL(win.location.href).searchParams.get('room'); } catch (e) { fromUrl = null; }
-    if (fromUrl) ui.code = fromUrl.toUpperCase().slice(0, 5);
+    if (fromUrl) { ui.code = fromUrl.toUpperCase().slice(0, 5); ui.invited = true; }
     render();
     if (!fromUrl) return;
     // Coming back to a room I'm already in (reload, or the host reopening the page).
