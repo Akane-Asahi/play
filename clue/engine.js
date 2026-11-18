@@ -64,7 +64,7 @@ const uncall = (game, pid) => {
 // Called into this room by someone else's suggestion: suggest here without rolling.
 export function stayIn(game, pid) {
   if (!isFull(game) || game.over || game.phase !== 'roll' || game.turn !== pid) return undefined;
-  if (!game.called || !game.called[pid] || B.roomOf(game.pos[pid]) < 0) return undefined;
+  if (!game.called || !game.called[pid] || B.roomOf(game.pos[pid]) < 0 || game.again) return undefined;
   return { ...uncall(game, pid), phase: 'suggest' };
 }
 export function roll(game, pid, dice) {
@@ -76,20 +76,32 @@ export function passage(game, pid) {
   if (!isFull(game) || game.over || game.phase !== 'roll' || game.turn !== pid) return undefined;
   const to = B.PASSAGE[B.roomOf(game.pos[pid])];
   if (to == null) return undefined;
-  return { ...uncall(game, pid), phase: 'suggest', pos: { ...game.pos, [pid]: B.inRoom(to) } };
+  const next = { ...uncall(game, pid), phase: 'suggest', pos: { ...game.pos, [pid]: B.inRoom(to) } };
+  delete next.again;
+  return next;
 }
 // dest: a corridor square, a room as -(k + 1), or 'stay'.
 export function move(game, pid, dest) {
   if (!isFull(game) || game.over || game.phase !== 'move' || game.turn !== pid || !game.dice) return undefined;
-  if (dest === 'stay') return { ...game, phase: 'end', nosug: true };
-  if (!Number.isInteger(dest)) return undefined;
   const r = B.reach(game.pos, pid, game.dice[0] + game.dice[1]);
+  // After a call nobody could answer you must leave the room, unless the dice leave nowhere to go.
+  if (dest === 'stay') {
+    if (game.again && (r.cells.size || Object.keys(r.rooms).length)) return undefined;
+    const next = { ...game, phase: 'end', nosug: true };
+    delete next.again;
+    return next;
+  }
+  if (!Number.isInteger(dest)) return undefined;
   if (dest < 0) {
     if (r.rooms[B.roomOf(dest)] == null) return undefined;
-    return { ...game, phase: 'suggest', pos: { ...game.pos, [pid]: dest } };
+    const next = { ...game, phase: 'suggest', pos: { ...game.pos, [pid]: dest } };
+    delete next.again;
+    return next;
   }
   if (!r.cells.has(dest)) return undefined;
-  return { ...game, phase: 'end', nosug: true, pos: { ...game.pos, [pid]: dest } };
+  const next = { ...game, phase: 'end', nosug: true, pos: { ...game.pos, [pid]: dest } };
+  delete next.again;
+  return next;
 }
 // Where a bot goes: the room it wants if it can get there, else any room, else closer to the one it wants.
 export function botMove(game, pid, goal, rng) {
@@ -101,6 +113,7 @@ export function botMove(game, pid, goal, rng) {
   const d = B.distTo(goal);
   let best = 'stay', bd = Infinity;
   r.cells.forEach((_, c) => { const v = d.get(c); if (v != null && v < bd) { bd = v; best = c; } });
+  if (best === 'stay' && game.again && r.cells.size) best = r.cells.keys().next().value;
   return best;
 }
 
@@ -136,13 +149,15 @@ export function answer(game, pid, r) {
   if (r === 'none' && cur.i + 1 < cur.order.length) return { ...game, cur: { ...cur, resp, i: cur.i + 1 } };
   const next = { ...game, phase: 'end', log: logOf(game).concat([{ t: 's', by: cur.by, cards: cur.cards, resp }]) };
   delete next.cur;
+  // Full game: if nobody could show a card, the suggester calls again, but has to leave the room first (roll and move).
+  if (isFull(game) && !resp.some((x) => x.r === 'showed')) { next.phase = 'roll'; next.again = true; }
   return next;
 }
 
 export function endTurn(game, pid, order) {
   if (!game || game.over || game.phase !== 'end' || game.turn !== pid) return undefined;
   const next = { ...game, phase: turnStart(game), turn: nextActive(game, order, pid) };
-  delete next.dice; delete next.nosug;
+  delete next.dice; delete next.nosug; delete next.again;
   return next;
 }
 
@@ -170,7 +185,7 @@ export function resolveAccuse(game, envelope, order) {
     return next;
   }
   next.phase = turnStart(game);
-  delete next.dice; delete next.nosug;
+  delete next.dice; delete next.nosug; delete next.again;
   next.turn = nextActive(next, order, by);
   return next;
 }

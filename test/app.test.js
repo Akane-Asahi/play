@@ -55,7 +55,7 @@ function act(c, plan) {
   if (c.q('[data-act=next]')) return c.click('[data-act=next]');
   if (c.q('[data-act=end]')) return c.click('[data-act=end]');
   if (c.q('[data-act=roll]')) return c.click('[data-act=roll]');
-  if (c.q('[data-act=stay]')) {
+  if (c.q('[data-act=stay]') || c.q('[data-act=go]')) {
     const go = c.qa('[data-act=go]'), rooms = go.filter((x) => +x.getAttribute('data-d') < 0), from = rooms.length ? rooms : go;
     return c.click(from.length ? from[Math.floor(Math.random() * from.length)] : '[data-act=stay]');
   }

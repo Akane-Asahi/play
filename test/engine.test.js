@@ -47,7 +47,7 @@ const S = loadSolver();
   assert.equal(g.phase, 'suggest');
   assert.equal(E.suggest(g, 'a', [0, 6, 13], order), undefined, 'only the room you are in');
   g = E.suggest(g, 'a', [0, 6, 12], order);
-  g = E.answer(E.answer(g, 'b', 'none'), 'c', 'none');
+  g = E.answer(g, 'b', 'showed');
   g = E.endTurn(g, 'a', order);
   assert(g.phase === 'roll' && g.turn === 'b' && !g.dice);
   g = E.move(E.roll(g, 'b', [1, 2]), 'b', 'stay');
@@ -58,12 +58,34 @@ const S = loadSolver();
   // a named suspect's player is brought into the room and may suggest there next turn
   g = E.suggest(g, 'a', [1, 6, 20], order);                 // suspect 1 is seat 1: player b
   assert(g.pos.b === g.pos.a && g.called.b, 'b is moved into the study');
-  g = E.endTurn(E.answer(E.answer(g, 'b', 'none'), 'c', 'none'), 'a', order);
+  g = E.endTurn(E.answer(g, 'b', 'showed'), 'a', order);
   assert.equal(E.stayIn(g, 'a'), undefined);
   const stay = E.stayIn(g, 'b');
   assert(stay.phase === 'suggest' && !stay.called, 'called player suggests without rolling');
   assert(!E.roll(g, 'b', [2, 2]).called, 'rolling gives the chance up');
   assert(!E.suggest(stay, 'b', [0, 7, 20], order).called, 'no call when already in the room');
+  // nobody could show a card: the suggester calls again, but has to leave the room first
+  {
+    let h = E.roll(E.newGame(order, { mode: 'full', rc0: 12 }), 'a', [1, 1]);
+    h = E.suggest(E.move(h, 'a', B.inRoom(0)), 'a', [0, 6, 12], order);
+    h = E.answer(E.answer(h, 'b', 'none'), 'c', 'none');
+    assert(h.phase === 'roll' && h.again && h.turn === 'a', 'no answer: roll again');
+    assert.equal(E.stayIn(h, 'a'), undefined);
+    h = E.roll(h, 'a', [1, 1]);
+    assert(h.phase === 'move' && h.again);
+    assert.equal(E.move(h, 'a', 'stay'), undefined, 'must leave the room');
+    const out = [...B.reach(h.pos, 'a', 2).cells.keys()][0];
+    const moved = E.move(h, 'a', out);
+    assert(moved.phase === 'end' && !moved.again, 'out in the corridor, call again later');
+    const viaDoor = E.move(E.roll(E.passage ? { ...h, phase: 'roll' } : h, 'a', [6, 6]), 'a', B.inRoom(1));
+    assert(viaDoor && viaDoor.phase === 'suggest' && !viaDoor.again, 'into another room: call again');
+    const p2 = E.passage({ ...h, phase: 'roll' }, 'a');
+    assert(p2 && p2.phase === 'suggest' && !p2.again, 'the secret passage is a way out too');
+    // a suggestion someone answered does not give another call
+    let k = E.roll(E.newGame(order, { mode: 'full', rc0: 12 }), 'a', [1, 1]);
+    k = E.answer(E.suggest(E.move(k, 'a', B.inRoom(0)), 'a', [0, 6, 12], order), 'b', 'showed');
+    assert(k.phase === 'end' && !k.again);
+  }
   // a pawn in a corridor blocks the square
   const r = B.reach({ a: B.idx(4, 0), b: B.idx(4, 1), c: B.idx(5, 0) }, 'a', 6);
   assert.equal(r.cells.size, 0, 'boxed in');

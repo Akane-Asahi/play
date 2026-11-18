@@ -380,7 +380,8 @@ export function startApp({ net, doc, win, delays }) {
       inner = '<div class="row"><button class="btn grow" data-act="roll">Roll Dice</button>' +
         (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>';
     } else if (g.phase === 'move') {
-      inner = '<div class="fsum">Tap a glowing square or room on the board</div><div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>';
+      const rr = g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null, mustLeave = g.again && rr && (rr.cells.size || Object.keys(rr.rooms).length);
+      inner = '<div class="fsum">Tap a glowing square or room on the board' + (mustLeave ? ' — you have to leave the room' : '') + '</div>' + (mustLeave ? '' : '<div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>');
     } else if (g.phase === 'end' && !ui.accusing) {
       inner = '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Make an accusation</button></div>';
     } else if (ui.confirm && ready) {
@@ -496,6 +497,7 @@ export function startApp({ net, doc, win, delays }) {
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
       const dice = g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '';
+      if (g.phase === 'roll' && g.again) return '<div class="ask"><div class="who">Call again</div><div class="muted">Nobody could show a card. Roll the dice and leave the room, then call again.</div></div>';
       if (g.phase === 'roll' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Roll the dice.</div></div>';
       if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
       if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div>' + dice + '<div class="muted">You rolled ' + (g.dice[0] + g.dice[1]) + '. Tap where you want to go.</div></div>';
@@ -507,7 +509,7 @@ export function startApp({ net, doc, win, delays }) {
     const hereK = full() ? B.roomOf(g.pos[g.turn]) : -1;
     h += '<div class="ask"><div class="muted">' + (g.phase === 'end' ? 'Waiting for' : 'Turn') + '</div><div class="who">' + esc(nmFull(g.turn)) + '</div>' +
       (g.phase === 'move' && g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '') + '<div class="muted">' +
-      (g.phase === 'end' ? 'to end their turn' : g.phase === 'roll' ? 'is about to roll the dice' : g.phase === 'move' ? 'rolled ' + (g.dice[0] + g.dice[1]) + ' and is moving'
+      (g.phase === 'end' ? 'to end their turn' : g.phase === 'roll' ? (g.again ? 'got no answer, and must roll and leave the room to call again' : 'is about to roll the dice') : g.phase === 'move' ? 'rolled ' + (g.dice[0] + g.dice[1]) + ' and is moving'
         : hereK >= 0 ? 'is in the ' + esc(D.CARDS[g.rc0 + hereK]) + ', choosing a suggestion' : 'is choosing a suggestion') + '</div></div>';
     if (E.isOut(g, me)) h += '<p class="muted center">Your accusation was wrong, so you are out. You still show cards when asked.</p>';
     return h;
