@@ -3,6 +3,7 @@
 A 3D version of the full Clue game with a toy-diorama look: chibi pawns, flat bright colours, toon shading
 and a fixed high camera. It runs the same rules as `../clue` (`engine.js`, `board.js`), drawn with three.js.
 
+- **3D game mode (the real game):** in `/clue/`, create a room and choose **3D game**. Same rules and room as the full game; the 3D board replaces the flat map, and the existing screens (roll, suggest, answer, notes, accusation) sit over it. Taps on glowing squares and rooms go through the same move as the flat map. If WebGL is missing the room shows the flat map.
 - **Play the sandbox:** `/Clue3D/` (e.g. `https://akane-asahi.github.io/play/Clue3D/`). You are Scarlett against two bots: roll, walk, enter rooms, take secret passages. Suggestions, cards and online rooms come next.
 - **Task board:** `/Clue3D/tasks.html`. Drag cards between To do, In progress and Done.
 
@@ -14,6 +15,7 @@ Serve the repo root with any static server and open `/Clue3D/`.
 ## Files
 
 - `index.html`, `clue3d.css`: page, import map, the bottom dock
+- `js/embed.js`: the 3D board as a part of the 2D game (state in through `update()`, taps out through `onMove()`); loaded on demand by `clue/main.js`
 - `js/main.js`: the sandbox game loop (local players, bots, tapping the board)
 - `js/scene.js`: renderer, diorama camera, lights, shadows, controls
 - `js/look.js`: the palette and toon materials (everything goes through here)

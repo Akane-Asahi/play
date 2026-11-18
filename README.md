@@ -70,15 +70,9 @@ When you create a room you pick the kind of game (the host can still switch it i
 
 ## Clues 3D (in progress)
 
-A 3D version of the full game with a toy-diorama look lives in `Clue3D/` (`/Clue3D/` on the site). It uses the same
-rules (`clue/engine.js`, `clue/board.js`) drawn with three.js, still with no build step. Today it is a sandbox: you
-against two bots, rolling, walking and entering rooms. The plan and progress are on the task board at
-`Clue3D/tasks.html`. See `Clue3D/README.md`.
+A 3D version of the full game with a toy-diorama look lives in `Clue3D/`, drawn with three.js and still with no build step.
 
-## Old rooms are cleaned up
-
-Realtime Database has no expiry, so every room has a "delete after" time in `roomIndex/<code>`: 3 hours for a lobby,
-24 hours once a game has started, 2 hours after the case is closed (the host's device sets it). Whoever creates or joins
-a room first deletes every room whose time is up; the rules in `database.rules.json` allow that delete only once the
-time has passed. Republish the rules after changing them. If the rules are not republished the app still works, the
-room just is not indexed and will not be cleaned up.
+- **3D game mode:** when creating a room in `/clue/`, choose **3D game** next to Fast game and Full game. It is the full game
+  (same rules, same room, same Firebase) with the mansion drawn in 3D. If a phone cannot do WebGL, that room shows the flat map.
+- **Sandbox:** `/Clue3D/` is a single-device sandbox (you against two bots) used to try the look.
+- The plan and progress are on the task board at `Clue3D/tasks.html`. See `Clue3D/README.md`.
