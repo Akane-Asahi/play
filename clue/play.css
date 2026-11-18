@@ -263,3 +263,10 @@ body.fullmap main{padding:0!important;max-width:none}
 .ci .cl .ln{animation:lblin .45s ease-out calc(var(--t,0s) * -1) both}
 @keyframes lblout{from{transform:none;opacity:1}to{transform:translateY(-110%);opacity:0}}
 @keyframes lblin{from{transform:translateY(110%);opacity:0}to{transform:none;opacity:1}}
+
+/* Final Accusation waiting dock for players who are not on turn */
+.float.slim{padding:10px;border-radius:999px}
+.float.slim .fsum{margin:2px 10px 8px;font-size:14px;text-align:center}
+.float.slim .btn{padding:12px}
+main:has(.float.slim){padding-bottom:110px}
+.hud .float.slim{border-radius:28px}

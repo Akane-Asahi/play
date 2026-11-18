@@ -129,3 +129,39 @@ function playGame(n, seed) {
 let turns = 0, games = 0;
 for (const n of [3, 4, 5, 6]) for (let s = 1; s <= 4; s++) { turns += playGame(n, n * 100 + s); games++; }
 console.log('engine tests ok:', games, 'bot games, avg', Math.round(turns / games), 'log entries');
+
+// Final accusation out of turn: request, window, cancel, pass, accuse
+{
+  const order = ['a', 'b', 'c'];
+  const env = [0, 7, 14];
+  let g = { phase: 'end', turn: 'a', mode: 'full', log: [] };
+  assert.equal(E.requestAccuse(g, 'a', order), undefined, 'the player on turn accuses directly');
+  g = E.requestAccuse(g, 'b', order);
+  assert(g.req.b && !E.requestAccuse(g, 'b', order), 'b is queued once');
+  g = E.requestAccuse(g, 'c', order);
+  let h = E.endTurn(g, 'a', order);
+  assert(h.phase === 'window' && h.turn === 'b' && h.win.q.join() === 'b,c' && h.win.phase === 'roll', 'turn over: window opens in seat order');
+  assert.equal(E.windowWho(h), 'b');
+  assert.equal(E.accuse(h, 'c', env), undefined, 'only the prompted player can accuse');
+  assert.equal(E.accuse(h, 'a', env), undefined, 'and not someone whose turn is over');
+  const p = E.windowPass(h, 'b', order);
+  assert(p.phase === 'window' && p.win.q.join() === 'c' && !p.req.b, 'pass moves on to the next requester');
+  const q = E.windowPass(p, 'c', order);
+  assert(q.phase === 'roll' && q.turn === 'b' && !q.win && !q.req, 'last pass starts the next turn');
+  // wrong accusation inside the window: out, next requester is asked, then play carries on
+  const acc = E.accuse(h, 'b', [1, 8, 15]);
+  assert(acc.phase === 'accusing' && acc.win && !acc.req.b, 'accusing keeps the window');
+  const r = E.resolveAccuse(acc, env, order);
+  assert(r.out.b && r.phase === 'window' && r.win.q.join() === 'c', 'wrong: b is out, c is asked');
+  const r2 = E.resolveAccuse(E.accuse(r, 'c', env), env, order);
+  assert(r2.over && r2.over.winner === 'c', 'c is right and wins');
+  // the player whose turn was next is knocked out: play moves on
+  const only = { phase: 'end', turn: 'a', mode: 'full', log: [], req: { b: true } };
+  const w2 = E.endTurn(only, 'a', order);
+  const x = E.resolveAccuse(E.accuse(w2, 'b', [1, 8, 15]), env, order);
+  assert(x.out.b && x.phase === 'roll' && x.turn === 'c' && !x.win, 'b was next to play and is out: c plays');
+  // cancelling the only request while the window is open closes it
+  const cc = E.cancelRequest(w2, 'b', order);
+  assert(cc.phase === 'roll' && cc.turn === 'b' && !cc.win, 'cancel closes an empty window');
+  console.log('Final accusation queue ok');
+}

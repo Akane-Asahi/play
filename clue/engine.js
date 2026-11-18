@@ -3,7 +3,7 @@
 //
 // game = {
 //   turn: pid,                       whose turn it is
-//   phase: 'suggest' | 'answer' | 'end' | 'accusing',
+//   phase: 'suggest' | 'answer' | 'end' | 'accusing' | 'window',
 //   cur:  { by, cards:[s,w,r], order:[pid...], i, n, resp:[{p, r}] }   the suggestion being answered
 //   acc:  { by, cards }              an accusation waiting for the host to check
 //   log:  [ {t:'s', by, cards, resp:[{p, r:'none'|'showed'}]} | {t:'a', by, cards, ok} ]
@@ -158,13 +158,59 @@ export function endTurn(game, pid, order) {
   if (!game || game.over || game.phase !== 'end' || game.turn !== pid) return undefined;
   const next = { ...game, phase: turnStart(game), turn: nextActive(game, order, pid) };
   delete next.dice; delete next.nosug; delete next.again;
+  return handoff(next, order);
+}
+
+// ---- Final accusations out of turn ----
+// Any player can ask to make an accusation at any time. It waits until the turn in progress is over; then the app
+// asks each waiting player in seat order (phase 'window'), and each of them can accuse or pass. Then play carries on.
+export function requestAccuse(game, pid, order) {
+  if (!game || game.over || isOut(game, pid) || !order.includes(pid) || game.turn === pid) return undefined;
+  if (game.req && game.req[pid]) return undefined;
+  const next = { ...game, req: { ...(game.req || {}), [pid]: true } };
+  if (game.win && !game.win.q.includes(pid)) next.win = { ...game.win, q: game.win.q.concat([pid]) };
   return next;
+}
+export function cancelRequest(game, pid, order) {
+  if (!game || game.over || !game.req || !game.req[pid]) return undefined;
+  const next = { ...game, req: { ...game.req } };
+  delete next.req[pid];
+  if (!Object.keys(next.req).length) delete next.req;
+  if (game.win && game.phase === 'window') {
+    const q = game.win.q.filter((p) => p !== pid);
+    if (q.length) next.win = { ...game.win, q }; else return closeWindow(next, order);
+  }
+  return next;
+}
+export function windowPass(game, pid, order) {
+  if (!game || game.over || game.phase !== 'window' || !game.win || game.win.q[0] !== pid) return undefined;
+  return cancelRequest(game, pid, order) || undefined;
+}
+// Who is being asked right now whether to accuse (or null).
+export const windowWho = (game) => (game && game.phase === 'window' && game.win ? game.win.q[0] : null);
+
+// The turn is over: if players are waiting to accuse, ask them before the next turn starts.
+function handoff(next, order) {
+  const q = order.filter((p) => next.req && next.req[p] && !isOut(next, p));
+  if (!q.length) { delete next.req; return next; }
+  return { ...next, win: { q, phase: next.phase }, phase: 'window' };
+}
+// Everyone waiting has answered: the next turn begins.
+function closeWindow(game, order) {
+  const n = { ...game, phase: game.win.phase };
+  delete n.win;
+  if (n.req && !Object.keys(n.req).length) delete n.req;
+  if (isOut(n, n.turn)) { n.turn = nextActive(n, order, n.turn); n.phase = turnStart(n); }
+  return n;
 }
 
 export function accuse(game, pid, cards) {
-  if (!game || game.over || game.turn !== pid || !validCards(cards)) return undefined;
-  if (game.phase !== 'suggest' && game.phase !== 'end' && !(isFull(game) && game.phase === 'roll')) return undefined;
-  return { ...game, phase: 'accusing', acc: { by: pid, cards: cards.slice() } };
+  if (!game || game.over || !validCards(cards) || isOut(game, pid)) return undefined;
+  const mine = game.turn === pid && (game.phase === 'suggest' || game.phase === 'end' || (isFull(game) && (game.phase === 'roll' || game.phase === 'move')));
+  if (!mine && windowWho(game) !== pid) return undefined;
+  const next = { ...game, phase: 'accusing', acc: { by: pid, cards: cards.slice() } };
+  if (next.req && next.req[pid]) { next.req = { ...next.req }; delete next.req[pid]; if (!Object.keys(next.req).length) delete next.req; }
+  return next;
 }
 
 // Host only: compare the accusation with the envelope.
@@ -184,10 +230,15 @@ export function resolveAccuse(game, envelope, order) {
     next.over = { winner: left[0] || null, envelope: envelope.slice(), byDefault: true };
     return next;
   }
+  if (game.win) {                                          // asked in the accusation window: the next turn has not started yet
+    const q = game.win.q.filter((p) => p !== by && !isOut(next, p));
+    if (q.length) return { ...next, phase: 'window', win: { ...game.win, q } };
+    return closeWindow(next, order);
+  }
   next.phase = turnStart(game);
   delete next.dice; delete next.nosug; delete next.again;
   next.turn = nextActive(next, order, by);
-  return next;
+  return handoff(next, order);
 }
 
 // Shuffle and deal. rng() -> [0,1). Returns { envelope:[s,w,r], hands:{pid:[cards]} }.

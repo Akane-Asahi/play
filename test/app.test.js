@@ -231,7 +231,8 @@ async function play(db, cs, code, plan, until) {
   assert(me.q('.float [data-act=suggest]').disabled, 'Suggest waits until three cards are chosen');
   assert(!me.q('.card.act [data-act=pick]') && !me.q('.card.act .chip'), 'no card names in the Your turn section');
   assert(!me.q('.plist') && !/\bPlayers\b/.test(me.text()), 'no Players section');
-  assert(!other.q('.float'), 'only the player on turn has the floating buttons');
+  assert(!other.q('.float [data-act=suggest]') && !other.q('.float [data-act=end]'), 'only the player on turn has the turn buttons');
+  assert(other.q('.float [data-act=req-accuse]'), 'everyone else still has the Final Accusation button');
   [0, 1, 2].forEach((k) => me.click(me.qa('tr.pk td[data-act=pick][data-k="' + k + '"]')[0]));
   assert.equal(me.qa('.nt tr.sel').length, 3, 'chosen cards are highlighted in the notes');
   assert(!me.q('.float [data-act=suggest]').disabled);
@@ -358,7 +359,7 @@ async function play(db, cs, code, plan, until) {
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
   const g0 = db.read('rooms/' + code + '/game');
   const me = cs.find((c) => c.uid === g0.turn);
-  assert(me.q('[data-act=roll]') && !me.q('[data-act=accuse-open]'), 'a normal roll has no accusation button');
+  assert(me.q('[data-act=roll]') && me.q('[data-act=accuse-open]'), 'Final Accusation is always there on your own turn');
   db.write('rooms/' + code + '/game', { ...g0, again: true }); db.notify(); await wait(20);
   const b = me.q('[data-act=accuse-open]');
   assert(b && b.textContent === 'Final Accusation' && me.q('[data-act=roll]'), 'roll and Final Accusation are both offered');
@@ -370,6 +371,32 @@ async function play(db, cs, code, plan, until) {
   me.click('[data-act=accuse-back]'); await wait(10);
   assert(me.q('[data-act=roll]'), 'back to rolling');
   console.log('L ok: Final Accusation when nobody could show a card');
+}
+// M: anyone can ask for a final accusation at any time; they are asked when the turn in progress is over
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const g0 = db.read('rooms/' + code + '/game');
+  const me = cs.find((c) => c.uid === g0.turn), w = cs.find((c) => c.uid !== g0.turn);
+  const b = w.q('.float [data-act=req-accuse]');
+  assert(b && b.textContent === 'Final Accusation', 'the waiting player has a floating Final Accusation');
+  w.click(b); await wait(30);
+  assert(db.read('rooms/' + code + '/game').req[w.uid], 'the request is queued');
+  assert(w.q('[data-act=req-cancel]') && !w.q('[data-act=req-accuse]'), 'and can be cancelled');
+  w.click('[data-act=req-cancel]'); await wait(30);
+  assert(!db.read('rooms/' + code + '/game').req, 'cancelled');
+  w.click('[data-act=req-accuse]'); await wait(30);
+  // the turn player finishes their turn (end phase)
+  db.write('rooms/' + code + '/game', { ...db.read('rooms/' + code + '/game'), phase: 'end' }); db.notify(); await wait(20);
+  me.click('[data-act=end]'); await wait(40);
+  const g1 = db.read('rooms/' + code + '/game');
+  assert(g1.phase === 'window' && g1.win.q[0] === w.uid, 'the turn is over: the window opens for the requester');
+  assert(w.q('[data-act=win-pass]') && w.q('[data-act=accuse-open]'), 'they are asked: accuse or pass');
+  assert(!me.q('.float [data-act=roll]'), 'nobody else can play meanwhile');
+  w.click('[data-act=win-pass]'); await wait(40);
+  const g2 = db.read('rooms/' + code + '/game');
+  assert(g2.phase === 'roll' && !g2.win && !g2.req, 'passing carries on with the next turn');
+  console.log('M ok: queued final accusation, prompt, pass');
 }
 console.log('app tests ok');
 process.exit(0);

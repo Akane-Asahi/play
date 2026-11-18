@@ -365,10 +365,12 @@ export function startApp({ net, doc, win, delays }) {
   // Am I choosing a suspect, weapon and room right now? (Then the names in my notes can be tapped.)
   function picking() {
     const g = game;
-    if (!g || g.over || g.turn !== uid) return false;
-    if (g.phase === 'roll') return !!ui.accusing;                              // only when making a final accusation
-    if (g.phase === 'answer' || g.phase === 'accusing' || g.phase === 'move') return false;
-    return g.phase !== 'end' || ui.accusing;
+    if (!g || g.over) return false;
+    if (E.windowWho(g) === uid) return !!ui.accusing;
+    if (g.turn !== uid) return false;
+    if (g.phase === 'answer' || g.phase === 'accusing' || g.phase === 'window') return false;
+    if (g.phase === 'roll' || g.phase === 'move' || g.phase === 'end') return !!ui.accusing;     // only when making a final accusation
+    return true;
   }
   // The first cell of a notes row: the card's name, tappable while I'm choosing.
   function nameCell(D, c, k, mine, extra) {
@@ -378,30 +380,45 @@ export function startApp({ net, doc, win, delays }) {
   const selClass = (c, k) => (ui.sel[k] === c ? ' sel' : '') + (picking() ? ' pk' : '');
 
   // The buttons that float at the bottom of the screen on my turn.
+  // The Final Accusation button is always there. On my own turn it opens the accusation at once; otherwise it puts
+  // my name in the queue, and I'm asked when the turn in progress is over.
   function floatHtml(D) {
     const g = game;
-    if (!g || g.over || g.turn !== uid || g.phase === 'answer' || g.phase === 'accusing') return '';
+    if (!g || g.over) return '';
+    const prompted = E.windowWho(g) === uid;
+    const mine = g.turn === uid && ['roll', 'move', 'suggest', 'end'].includes(g.phase);
+    if (!mine && !prompted) {
+      if (E.isOut(g, uid) || g.phase === 'accusing' || g.turn === uid) return '';
+      const queued = !!(g.req && g.req[uid]);
+      return '<div class="float slim" role="region" aria-label="Final accusation">' + (queued
+        ? '<div class="fsum">You will be asked when this turn is over.</div><div class="row"><button class="btn ghost grow" data-act="req-cancel">Cancel accusation</button></div>'
+        : '<div class="row"><button class="btn danger grow" data-act="req-accuse">Final Accusation</button></div>') + '</div>';
+    }
     const ready = ui.sel.every((c) => c != null);
+    const accuseBtn = '<div class="row"><button class="btn danger grow" data-act="accuse-open">Final Accusation</button></div>';
     let inner;
-    if (g.phase === 'roll' && !ui.accusing) {
-      const to = B.PASSAGE[B.roomOf(g.pos[uid])];
-      inner = '<div class="row"><button class="btn grow" data-act="roll">Roll Dice</button>' +
-        (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>' +
-        (g.again ? '<div class="row"><button class="btn danger grow" data-act="accuse-open">Final Accusation</button></div>' : '');
-    } else if (g.phase === 'move') {
-      const rr = g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null, mustLeave = g.again && rr && (rr.cells.size || Object.keys(rr.rooms).length);
-      inner = '<div class="fsum">Tap a glowing square or room on the board' + (mustLeave ? ' — you have to leave the room' : '') + '</div>' + (mustLeave ? '' : '<div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>');
-    } else if (g.phase === 'end' && !ui.accusing) {
-      inner = '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Make an accusation</button></div>';
+    if (prompted && !ui.accusing && !ui.confirm) {
+      inner = '<div class="fsum"><b>Make your accusation now?</b> If you are wrong, you are out.</div>' +
+        '<div class="row"><button class="btn danger grow" data-act="accuse-open">Make accusation</button><button class="btn ghost grow" data-act="win-pass">Pass</button></div>';
     } else if (ui.confirm && ready) {
       inner = '<div class="fsum warnt"><b>Accuse ' + esc(D.CARDS[ui.sel[0]]) + ' with the ' + esc(D.CARDS[ui.sel[1]]) + ' in the ' + esc(D.CARDS[ui.sel[2]]) + '?</b> If you are wrong, you are out.</div>' +
         '<div class="row"><button class="btn danger grow" data-act="accuse-yes">Yes, accuse</button><button class="btn ghost grow" data-act="accuse-no">Cancel</button></div>';
+    } else if (ui.accusing) {
+      const sum = ready ? ui.sel.map((c) => esc(D.CARDS[c])).join(' · ') : (ui.sel.some((c) => c != null) ? ui.sel.map((c, k) => c != null ? esc(D.CARDS[c]) : '<i>' + S.CAT_NAMES[k].toLowerCase() + '?</i>').join(' · ') : 'Tap a suspect, a weapon and a room in your notes');
+      inner = '<div class="fsum">' + sum + '</div><div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">' + (prompted ? 'Back' : 'Cancel') + '</button></div>';
+    } else if (g.phase === 'roll') {
+      const to = B.PASSAGE[B.roomOf(g.pos[uid])];
+      inner = '<div class="row"><button class="btn grow" data-act="roll">Roll Dice</button>' +
+        (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>' + accuseBtn;
+    } else if (g.phase === 'move') {
+      const rr = g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null, mustLeave = g.again && rr && (rr.cells.size || Object.keys(rr.rooms).length);
+      inner = '<div class="fsum">Tap a glowing square or room on the board' + (mustLeave ? ' — you have to leave the room' : '') + '</div>' + (mustLeave ? '' : '<div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>') + accuseBtn;
+    } else if (g.phase === 'end') {
+      inner = '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Final Accusation</button></div>';
     } else {
       const sum = ready ? ui.sel.map((c) => esc(D.CARDS[c])).join(' · ') : (ui.sel.some((c) => c != null) ? ui.sel.map((c, k) => c != null ? esc(D.CARDS[c]) : '<i>' + S.CAT_NAMES[k].toLowerCase() + '?</i>').join(' · ') : 'Tap a suspect, a weapon and a room in your notes');
-      inner = '<div class="fsum">' + sum + '</div>' + (g.phase === 'end' || g.phase === 'roll'
-        ? '<div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">Back</button></div>'
-        : (full() && ready && !sugReady() ? '<div class="fsum"><i>You can only suggest the ' + esc(D.CARDS[hereCard()]) + ', where you are. An accusation can name any room.</i></div>' : '') +
-          '<div class="row"><button class="btn grow" data-act="suggest"' + (sugReady() ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>');
+      inner = '<div class="fsum">' + sum + '</div>' + (full() && ready && !sugReady() ? '<div class="fsum"><i>You can only suggest the ' + esc(D.CARDS[hereCard()]) + ', where you are. An accusation can name any room.</i></div>' : '') +
+        '<div class="row"><button class="btn grow" data-act="suggest"' + (sugReady() ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>';
     }
     return '<div class="float" role="region" aria-label="Your move">' + inner + '</div>';
   }
@@ -491,7 +508,7 @@ export function startApp({ net, doc, win, delays }) {
   // even when the player finishes it sooner. My own turn is never held back.
   function actionHtml(D) {
     const raw = actionRaw(D), g = game;
-    if (g.turn === uid || !(D0.min > 0)) { ui.lbl = null; return raw; }
+    if (g.turn === uid || E.windowWho(g) === uid || !(D0.min > 0)) { ui.lbl = null; return raw; }
     const key = g.phase + ':' + g.turn + ':' + E.logOf(g).length, now = Date.now(), L = ui.lbl;
     if (!L || L.sk !== meta.startedAt) { ui.lbl = { sk: meta.startedAt, key, html: raw, at: now }; return raw; }
     if (L.key === key) { L.html = raw; return raw; }
@@ -503,10 +520,15 @@ export function startApp({ net, doc, win, delays }) {
   function actionRaw(D) {
     const g = game, me = uid;
     if (g.phase === 'answer' && g.cur) return '<div class="ask"><div class="muted">Turn</div><div class="who">' + esc(nmFull(g.turn)) + '</div><div class="muted">is waiting for answers</div></div>';
+    if (g.phase === 'window') {
+      const w = E.windowWho(g);
+      if (w === me) return '<div class="ask"><div class="who">Final accusation</div><div class="muted">' + (ui.accusing ? 'Choose a suspect, a weapon and a room in your notes. If you are wrong, you are out.' : 'Make your accusation now, or pass.') + '</div></div>';
+      return '<div class="ask"><div class="muted">Final accusation</div><div class="who">' + esc(nmFull(w)) + '</div><div class="muted">is deciding whether to accuse</div></div>';
+    }
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
       const dice = g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '';
-      if (g.phase === 'roll' && ui.accusing) return '<div class="ask"><div class="who">Final accusation</div><div class="muted">Choose a suspect, a weapon and a room in your notes. If you are wrong, you are out.</div></div>';
+      if (ui.accusing) return '<div class="ask"><div class="who">Final accusation</div><div class="muted">Choose a suspect, a weapon and a room in your notes. If you are wrong, you are out.</div></div>';
       if (g.phase === 'roll' && g.again) return '<div class="ask"><div class="who">Call again</div><div class="muted">Nobody could show a card. Roll the dice and leave the room to call again, or make your final accusation.</div></div>';
       if (g.phase === 'roll' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Roll the dice.</div></div>';
       if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
@@ -853,6 +875,9 @@ export function startApp({ net, doc, win, delays }) {
       case 'accuse-no': ui.confirm = false; render(); break;
       case 'accuse-yes': run(doAccuse); break;
       case 'accuse-open': ui.accusing = true; render(); break;
+      case 'req-accuse': run(async () => { const ord = order(); await tx((g) => E.requestAccuse(g, uid, ord)); toast('You will be asked when this turn is over'); }); break;
+      case 'req-cancel': run(() => { const ord = order(); return tx((g) => E.cancelRequest(g, uid, ord)); }); break;
+      case 'win-pass': run(() => { const ord = order(); resetPick(); return tx((g) => E.windowPass(g, uid, ord)); }); break;
       case 'accuse-back': resetPick(); render(); break;
       case 'end': run(doEndTurn); break;
       case 'show': run(() => showCard(+el.dataset.c)); break;
