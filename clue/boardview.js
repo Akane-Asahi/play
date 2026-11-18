@@ -11,6 +11,7 @@ export const ROOM_ART = {
   billiardroom: { src: 'img/rooms/billiard-room.webp', ratio: 837 / 900, w: 176 },
   conservatory: { src: 'img/rooms/conservatory-room.webp', ratio: 838 / 900, w: 176 },
   diningroom: { src: 'img/rooms/dining-room.webp', ratio: 1027 / 900, w: 176 },
+  lounge: { src: 'img/rooms/lounge-room.webp', ratio: 795 / 900, w: 176 },
   hall: { src: 'img/rooms/hall-room.webp', ratio: 885 / 900, w: 176 },
   kitchen: { src: 'img/rooms/kitchen-room.webp', ratio: 779 / 900, w: 176 },
 };
@@ -62,12 +63,16 @@ function spot(v, seat) {
 export function boardSvg(o) {
   const Hh = (B.W + B.H) * TH / 2 + TOP + 18;
   // A tall room picture may stick out above the mansion; make room for it.
-  let top = 0;
+  let top = 0, left = 0, right = B.W * TW;
   for (let k = 0; k < B.ROOMS; k++) {
     const art = ROOM_ART[String(o.roomNames[k] || '').toLowerCase().replace(/[^a-z]/g, '')];
-    if (art) { const r = B.roomRect(k); top = Math.min(top, P(r.x + 4, r.y + 4)[1] + 9 - art.w * art.ratio - 2); }
+    if (art) {
+      const r = B.roomRect(k), cx = P(r.x + 2, r.y + 2)[0];
+      top = Math.min(top, P(r.x + 4, r.y + 4)[1] + 9 - art.w * art.ratio - 2);
+      left = Math.min(left, cx - art.w / 2 - 2); right = Math.max(right, cx + art.w / 2 + 2);   // pictures a little wider than the room
+    }
   }
-  let s = '<svg class="iso" viewBox="0 ' + top.toFixed(1) + ' ' + (B.W * TW) + ' ' + (Hh - top).toFixed(1) + '" role="img" aria-label="The mansion">' +
+  let s = '<svg class="iso" viewBox="' + left.toFixed(1) + ' ' + top.toFixed(1) + ' ' + (right - left).toFixed(1) + ' ' + (Hh - top).toFixed(1) + '" role="img" aria-label="The mansion">' +
     '<defs><radialGradient id="cg"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient></defs>';
   // slab
   const A = P(0, 0), Bq = P(B.W, 0), C = P(B.W, B.H), Dq = P(0, B.H), dn = (p) => [p[0], p[1] + 12];
