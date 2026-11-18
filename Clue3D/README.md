@@ -21,7 +21,7 @@ Serve the repo root with any static server and open `/Clue3D/`.
 - `js/look.js`: the palette and toon materials (everything goes through here)
 - `js/board3d.js`: the mansion built from `../clue/board.js`, room stand-in furniture, reach highlights, picking
 - `js/pawns.js`: chibi stand-in pawns, turn marker, swapping in suspect models
-- `js/fx.js`: the Sprint dash (flashing light on the pawn's back) and the smoke puff that fades over 3 seconds
+- `js/fx.js`: the Sprint dash (flashing light on the pawn's back) and the smoke it leaves along its path and lands in, fading over 3 seconds
 - `js/anim.js`: tweens, hop with squash and stretch
 - `js/path.js`: the squares a pawn walks through (tested in `../test/clue3d.test.js`)
 - `js/assets.js`, `models/`: loading generated GLB models; see `models/README.md` for the model rules
