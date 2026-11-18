@@ -7,7 +7,7 @@ import { loadSolver } from './load-solver.js';
 const S = loadSolver();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-let DL = { bot: 0, none: 0, min: 0 };          // delays for every page: no waiting, unless a test says otherwise
+let DL = { bot: 0, none: 0, min: 0, slide: 0 };          // delays for every page: no waiting, unless a test says otherwise
 let L3D;                                       // fake loader for the 3D board view, set by the 3D tests
 function open(db, uid, query) {
   const dom = new JSDOM('<header><span class="hside"><button id="players-btn" data-act="players" hidden></button></span><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
@@ -58,6 +58,7 @@ function act(c, plan) {
   if (c.q('[data-act=next]')) return c.click('[data-act=next]');
   if (c.q('[data-act=end]')) return c.click('[data-act=end]');
   const cardBtns = c.qa('[data-act=card]').filter((x) => !x.disabled);
+  if (c.q('.sheet') && c.q('[data-act=deduce]') && !cardBtns.length) return c.click('.sheet .sx');   // the movement buttons hide while Notes is open
   if (c.q('[data-act=deduce]') && cardBtns.length) {          // my move: Deduce now and then when it is open, else pick a card, then a square
     if (c.q('[data-act=deduce].open') && Math.random() < 0.3) return c.click('[data-act=deduce]');
     const on = cardBtns.find((x) => x.classList.contains('on'));
@@ -358,7 +359,7 @@ async function play(db, cs, code, plan, until) {
   const g3 = db.read('rooms/' + code + '/game');
   assert(g3.phase === 'answer' || (g3.log || []).length === 2, 'then the bot plays');
   assert.equal(db.read('rooms/' + code + '/players/h2/hold'), null, 'Hana lets go of the game');
-  DL = { bot: 0, none: 0, min: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
   console.log('K ok: states last a minimum, names under the cards, bots wait for Next turn');
 }
 // L: when nobody could show a card, the player can move or make a final accusation
@@ -547,6 +548,25 @@ async function play(db, cs, code, plan, until) {
   t.click(cells[0]); await wait(20);
   assert.deepEqual(db.read(path).cards[t.uid], before, 'Tired is never spent');
   console.log('P ok: Stamina & Pace buttons, Deduce, Tired');
+}
+// Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 60 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const me = cs.find((c) => c.uid === db.read('rooms/' + code + '/game').turn);
+  assert(me.qa('.stam').length === 3, 'movement buttons before opening');
+  me.click('[data-act=sheet][data-s=turns]'); await wait(10);
+  assert(me.q('.sheet.enter') && me.q('.sbackdrop.enter'), 'slides up when opened');
+  assert(!me.q('.stam'), 'movement buttons are gone while the sheet is open');
+  me.click('[data-act=sheet][data-s=notes]'); await wait(10);
+  assert(me.q('.sheet') && !me.q('.sheet.enter') && !me.q('.stam'), 'switching sheets does not slide again');
+  me.click('.sheet .sx'); await wait(10);
+  assert(me.q('.sheet.out') && me.q('.sbackdrop.out') && !me.q('.stam'), 'slides down before it goes');
+  await wait(150);
+  assert(!me.q('.sheet') && me.qa('.stam').length === 3, 'gone, and the movement buttons are back');
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  console.log('Q ok: sheets slide, movement buttons hide');
 }
 console.log('app tests ok');
 process.exit(0);

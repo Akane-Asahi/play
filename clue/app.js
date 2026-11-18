@@ -12,7 +12,7 @@ const isBoardMode = (m) => m === 'full' || m === '3d';
 // load3d (optional): () => import(...) of the 3D board view. Without it, or when WebGL is missing, a 3D room shows the 2D map.
 export function startApp({ net, doc, win, delays, load3d }) {
   const S = win.ClueSolver;
-  const D0 = { bot: 3000, none: 900, min: 3000, ...(delays || {}) };   // min: how long each state stays on screen
+  const D0 = { bot: 3000, none: 900, min: 3000, slide: 260, ...(delays || {}) };   // min: how long each state stays on screen
   const NAME_KEY = 'clues-play-name';
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const SUS_COLORS = { scarlett: ['#c62828', '#ffffff'], mustard: ['#e1ad01', '#231a00'], white: ['#ffffff', '#222222', '#b9b4aa'],
@@ -836,7 +836,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   // the card is spent when I pick the square.
   function stamHtml() {
     const g = game;
-    if (!hasMap() || g.over || !g.cards || !g.cards[uid] || E.isOut(g, uid)) return '';
+    if (!hasMap() || g.over || !g.cards || !g.cards[uid] || E.isOut(g, uid) || ui.sheet) return '';   // hidden while Notes / Turns are open
     const c = E.cardsOf(g, uid), mine = g.turn === uid && g.phase === 'move', tir = E.tired(g, uid);
     const btn = (k, n, tag) => '<button class="fab stam k-' + k + (mine && ui.card === k ? ' on' : '') + (n ? '' : ' zero') + '" data-act="card" data-k="' + k + '"' + (mine && n ? '' : ' disabled') + ' aria-pressed="' + (mine && ui.card === k ? 'true' : 'false') +
       '" aria-label="' + E.CARD_NAMES[k] + ', ' + tag + (k === 'f' ? ' spaces' : ' left') + ', up to ' + E.STEPS[k] + ' spaces" title="' + E.CARD_NAMES[k] + '"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">' + ICON_CARD[k] + '</svg><b>' + tag + '</b></button>';
@@ -849,7 +849,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
   function sheetHtml(D) {
     if (!ui.sheet) return '';
     const notes = ui.sheet === 'notes';
-    return '<div class="sbackdrop" data-act="sheet" data-s=""></div><aside class="sheet" role="dialog" aria-label="' + (notes ? 'Your notes' : 'Turns') + '"><button class="x sx" data-act="sheet" data-s="" aria-label="Close">×</button>' +
+    const en = ui.sheetEnter ? ' enter' : '';
+    return '<div class="sbackdrop' + en + '" data-act="sheet" data-s=""></div><aside class="sheet' + en + '" role="dialog" aria-label="' + (notes ? 'Your notes' : 'Turns') + '"><button class="x sx" data-act="sheet" data-s="" aria-label="Close">×</button>' +
       '<div class="sbody">' + (notes ? notesHtml(D) : turnsHtml(D)) + '</div></aside>';
   }
 
@@ -973,7 +974,21 @@ export function startApp({ net, doc, win, delays, load3d }) {
       case 'finale-close': ui.finaleClosed = (meta.startedAt || 0) + ':' + game.over.winner; render(); break;
       case 'finale-open': ui.finaleClosed = null; render(); break;
       case 'players': ui.plOpen = !ui.plOpen; render(); break;
-      case 'sheet': ui.sheet = el.dataset.s && ui.sheet !== el.dataset.s ? el.dataset.s : null; render(); break;
+      case 'sheet': {
+        const want = el.dataset.s && ui.sheet !== el.dataset.s ? el.dataset.s : null;
+        if (ui.sheetClosing) break;
+        if (!want && ui.sheet) {                         // slide down and out, then take it away
+          const sh = doc.querySelector('.sheet'), bd = doc.querySelector('.sbackdrop');
+          if (!sh || !D0.slide) { ui.sheet = null; ui.sheetEnter = false; render(); break; }
+          ui.sheetClosing = true; sh.classList.remove('enter'); sh.classList.add('out'); if (bd) { bd.classList.remove('enter'); bd.classList.add('out'); }
+          win.setTimeout(() => { ui.sheetClosing = false; ui.sheet = null; render(); }, D0.slide + 20);
+          break;
+        }
+        ui.sheetEnter = !ui.sheet && !!want && D0.slide > 0;   // slide up from the bottom only when it was closed
+        ui.sheet = want; render();
+        if (ui.sheetEnter) win.setTimeout(() => { ui.sheetEnter = false; }, D0.slide + 60);
+        break;
+      }
       case 'pexp': ui.plExp[el.dataset.p] = !ui.plExp[el.dataset.p]; render(); break;
       case 'suggest': run(doSuggest); break;
       case 'accuse': ui.confirm = true; render(); break;
