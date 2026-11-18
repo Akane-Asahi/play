@@ -191,7 +191,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 
 // ---- render loop ----
 renderer.setAnimationLoop((t) => {
-  step(t);
+  step(t); board.tick(t);
   controls.update();
   const tp = pawns[game.turn];
   if (tp) { marker.position.set(tp.position.x, tp.position.y, tp.position.z); bobMarker(marker, t); }

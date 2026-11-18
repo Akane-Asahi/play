@@ -128,6 +128,7 @@ export function buildBoard(scene) {
     const name = label(ROOM_NAMES[k]); name.position.set(c.x, FLOOR_Y + 0.45, c.z + 2.25); g.add(name);
     // the "you can go here" glow: a soft column of light standing on the floor
     const beam = new THREE.Mesh(new THREE.BoxGeometry(3.9, 2.4, 3.9), new THREE.MeshBasicMaterial({ color: PALETTE.beam, transparent: true, opacity: 0.3, depthWrite: false }));
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(beam.geometry), new THREE.LineBasicMaterial({ color: PALETTE.neonHi })); beam.add(edges); beam.userData.edges = edges;
     beam.position.set(c.x, FLOOR_Y + 1.2, c.z); beam.visible = false; beam.userData.room = k; g.add(beam);
     root.add(g);
     rooms.push({ k, group: g, floor, props, beam, label: name });
@@ -135,13 +136,23 @@ export function buildBoard(scene) {
 
   // reachable-square markers (instanced, count changes per card)
   const markGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.06, 20);
-  const marks = new THREE.InstancedMesh(markGeo, new THREE.MeshBasicMaterial({ color: '#ffb52e' }), 140);
+  const marks = new THREE.InstancedMesh(markGeo, new THREE.MeshBasicMaterial({ color: PALETTE.neon }), 140);
   marks.count = 0; root.add(marks);
+  // a wider soft halo under every marker, pulsing: the neon glow
+  const halos = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.52, 0.52, 0.02, 24), new THREE.MeshBasicMaterial({ color: PALETTE.neonDeep, transparent: true, opacity: 0.6, depthWrite: false }), 140);
+  halos.count = 0; halos.renderOrder = 3; root.add(halos);
+  const dim = new THREE.Color(PALETTE.neon), hi = new THREE.Color(PALETTE.neonHi);
+  function tick(t) {                                   // called every frame: the glow breathes
+    const k = 0.5 + 0.5 * Math.sin(t / 170);
+    if (marks.count) { marks.material.color.copy(dim).lerp(hi, k); halos.material.opacity = 0.5 + 0.45 * k; halos.material.color.set(PALETTE.neonDeep).lerp(dim, k * 0.6); halos.scale.setScalar(1); }
+    for (const r of rooms) if (r.beam.visible) { r.beam.material.opacity = 0.2 + 0.28 * k; r.beam.userData.edges.material.color.copy(dim).lerp(hi, k); }
+  }
 
   function showReach(go) {
     let n = 0;
     if (go) go.cells.forEach((_, i) => { const [x, y] = B.xy(i); const p = sq(x, y, TILE_H + 0.03); m4.makeTranslation(p.x, p.y, p.z); marks.setMatrixAt(n++, m4); });
-    marks.count = n; marks.instanceMatrix.needsUpdate = true;
+    for (let i = 0; i < n; i++) { marks.getMatrixAt(i, m4); m4.setPosition(m4.elements[12], m4.elements[13] - 0.02, m4.elements[14]); halos.setMatrixAt(i, m4); }
+    marks.count = halos.count = n; marks.instanceMatrix.needsUpdate = halos.instanceMatrix.needsUpdate = true;
     rooms.forEach((r) => { r.beam.visible = !!go && go.rooms[r.k] != null; });
   }
 
@@ -171,5 +182,5 @@ export function buildBoard(scene) {
   // Rooms can be named differently in other editions.
   const setRoomName = (k, text) => { if (rooms[k] && rooms[k].name !== text) { rooms[k].name = text; rooms[k].label.userData.draw(text); } };
 
-  return { root, rooms, showReach, setRoomModel, setRoomName, pick };
+  return { root, rooms, showReach, setRoomModel, setRoomName, pick, tick };
 }

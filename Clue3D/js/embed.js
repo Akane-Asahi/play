@@ -150,6 +150,7 @@ export function createBoardView({ doc, win, onMove }) {
     win.requestAnimationFrame(loop);
     if (!el.isConnected || doc.hidden) return;
     step(t);
+    board.tick(t);
     controls.update();
     const tp = cur && pawns.get(cur.turn);
     marker.visible = !!tp && !tp.out;

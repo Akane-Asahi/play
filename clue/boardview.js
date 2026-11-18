@@ -65,8 +65,8 @@ function beam(x0, y0, z) {
   const face = (a, b) => poly(pts([a, b, up(b), up(a)]), 'fill="url(#bm)"');
   const edge = (p) => '<rect x="' + (p[0] - 1.6).toFixed(1) + '" y="' + (p[1] - z).toFixed(1) + '" width="3.2" height="' + z + '" fill="url(#bm)"/>';
   return '<g class="beam" pointer-events="none">' + face(A, Bq) + face(A, D) + face(D, C) + face(C, Bq) +
-    poly(pts([A, Bq, C, D].map(up)), 'fill="rgba(255,216,122,.07)" stroke="#ffd87a" stroke-width="1.6"') +
-    edge(A) + edge(Bq) + edge(C) + edge(D) + poly(pts([A, Bq, C, D]), 'fill="none" stroke="#ffd87a" stroke-width="2.2"') + '</g>';
+    poly(pts([A, Bq, C, D].map(up)), 'fill="rgba(25,240,255,.05)" stroke="#9ffcff" stroke-width="2.2"') +
+    edge(A) + edge(Bq) + edge(C) + edge(D) + poly(pts([A, Bq, C, D]), 'fill="none" stroke="#9ffcff" stroke-width="2.6"') + '</g>';
 }
 
 // o: { pos, order, me, turn, out:{pid}, roomNames:[9], go: { cells: Map, rooms: {} } | null }
@@ -84,7 +84,7 @@ export function boardSvg(o) {
   }
   let s = '<svg class="iso" viewBox="' + left.toFixed(1) + ' ' + top.toFixed(1) + ' ' + (right - left).toFixed(1) + ' ' + (Hh - top).toFixed(1) + '" role="img" aria-label="The mansion">' +
     '<defs><radialGradient id="cg"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>' +
-    '<linearGradient id="bm" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd87a" stop-opacity=".34"/><stop offset="1" stop-color="#ffd87a" stop-opacity=".02"/></linearGradient></defs>';
+    '<linearGradient id="bm" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#19f0ff" stop-opacity=".26"/><stop offset="1" stop-color="#19f0ff" stop-opacity=".02"/></linearGradient></defs>';
   // slab
   const A = P(0, 0), Bq = P(B.W, 0), C = P(B.W, B.H), Dq = P(0, B.H), dn = (p) => [p[0], p[1] + 12];
   s += poly(pts([Dq, C, dn(C), dn(Dq)]), 'fill="#15130f"') + poly(pts([C, Bq, dn(Bq), dn(C)]), 'fill="#1e1b16"') + poly(pts([A, Bq, C, Dq]), 'fill="#2c2a26"');
@@ -140,12 +140,14 @@ export function boardSvg(o) {
   s += labels;
   // where I can go
   if (o.go) {
+    s += '<g class="goset">';
     o.go.cells.forEach((_, i) => { const [x, y] = B.xy(i); s += poly(quad(x, y, 1, 1), 'class="go" data-act="go" data-d="' + i + '"'); });
     Object.keys(o.go.rooms).forEach((k) => {
       const r = B.roomRect(+k), art = ROOM_ART[String(o.roomNames[+k] || '').toLowerCase().replace(/[^a-z]/g, '')];
       s += beam(r.x, r.y, art ? Math.max(40, art.w * art.ratio - 92) : 70);
       s += poly(quad(r.x, r.y, 4, 4), 'class="go room" data-act="go" data-d="' + B.inRoom(+k) + '"');
     });
+    s += '</g>';
   }
   // pawns, far ones first
   o.order.map((p, seat) => ({ p, seat, at: spot(o.pos[p], seat) })).filter((q) => o.pos[q.p] != null)

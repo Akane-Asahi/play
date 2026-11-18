@@ -7,7 +7,7 @@ export const PALETTE = {
   night: '#17130f', slab: '#2c2a26', slabSide: '#1e1b16',
   corridorA: '#d9c7a3', corridorB: '#cdb994', door: '#e8b85c', start: '#f2e3c2',
   wall: '#f3e6cf', wallTop: '#b98d5a', trim: '#7a5233',
-  gold: '#ffd27a', beam: '#ffd87a', shadow: '#3b2a1e',
+  gold: '#ffd27a', beam: '#00dcff', neon: '#00f0ff', neonHi: '#6ff6ff', neonDeep: '#0079a0', shadow: '#3b2a1e',
   // Room floors, by room card order: Kitchen, Ballroom, Conservatory, Dining Room, Billiard Room, Library, Lounge, Hall, Study
   floors: ['#9fc3a8', '#c9a8d8', '#a8d89a', '#e3a989', '#7fc6b7', '#c99b72', '#e7a1b4', '#e5cf8f', '#9fb1dc'],
   // Seat colours (seat 0 = Scarlett ...), same order as the 2D board
