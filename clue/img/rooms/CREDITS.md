@@ -4,7 +4,7 @@ Room pictures supplied by the game's owner (placeholders; replace or confirm usa
 
 - `library-room.webp`: the Library.
 - `study-desk.webp`: the Study.
-- `ballroom-room.webp`: the Ballroom.
+- `ballroom-room.webp`, `billiard-room.webp`, `conservatory-room.webp`, `dining-room.webp`, `hall-room.webp`, `kitchen-room.webp`: the Ballroom, Billiard Room, Conservatory, Dining Room, Hall and Kitchen.
 
 A render of "Cyberpunk Micro-Apartments" by Mikita_Hubanau (CC BY-NC 4.0,
 https://sketchfab.com/3d-models/cyberpunk-micro-apartments-fd8011e2af0e43288f5445600197ea77)

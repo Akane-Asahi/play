@@ -7,7 +7,12 @@ const TW = 40, TH = 20, WH = 14, TOP = WH + 12, OX = B.H * TW / 2;
 export const ROOM_ART = {
   library: { src: 'img/rooms/library-room.webp', ratio: 852 / 900, w: 176 },
   study: { src: 'img/rooms/study-desk.webp', ratio: 892 / 900, w: 176 },
-  ballroom: { src: 'img/rooms/ballroom-room.webp', ratio: 972 / 900, w: 176 },
+  ballroom: { src: 'img/rooms/ballroom-room.webp', ratio: 969 / 900, w: 176 },
+  billiardroom: { src: 'img/rooms/billiard-room.webp', ratio: 837 / 900, w: 176 },
+  conservatory: { src: 'img/rooms/conservatory-room.webp', ratio: 838 / 900, w: 176 },
+  diningroom: { src: 'img/rooms/dining-room.webp', ratio: 1027 / 900, w: 176 },
+  hall: { src: 'img/rooms/hall-room.webp', ratio: 885 / 900, w: 176 },
+  kitchen: { src: 'img/rooms/kitchen-room.webp', ratio: 779 / 900, w: 176 },
 };
 export const SEAT_COLORS = ['#c62828', '#e1ad01', '#f2efe8', '#2e7d32', '#1565c0', '#8e24aa'];
 const FLOORS = ['#8b8f78', '#7d6c93', '#5c8a6a', '#94705c', '#4c7b72', '#7d5d49', '#8e5c6b', '#8d8062', '#5c6d8f'];
