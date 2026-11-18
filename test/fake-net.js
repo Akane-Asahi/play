@@ -30,7 +30,7 @@ export class FakeDb {
     const db = this;
     const host = (code) => db.read('rooms/' + code + '/meta/host') === uid;
     const member = (code) => db.read('rooms/' + code + '/players/' + uid) != null;
-    const DAY = 24 * 3600 * 1000, expired = (code) => { const t = db.read('roomIndex/' + code); return t != null && t < Date.now() - DAY; };
+    const expired = (code) => { const t = db.read('roomIndex/' + code); return t != null && t < Date.now(); };
     const canRead = (path) => {
       const [r, code, area, who] = path.split('/');
       if (r === 'roomIndex') return true;
@@ -42,8 +42,8 @@ export class FakeDb {
     };
     const canWrite = (path, value) => {
       const [r, code, area, who, n] = path.split('/');
-      if (r === 'roomIndex') return code ? (value == null ? host(code) || expired(code) : db.read(path) == null && typeof value === 'number' && value <= Date.now() + 300000 && value >= Date.now() - 600000) : false;
-      if (r === 'rooms' && code && !area) return value == null && (host(code) || expired(code));   // the host, or anyone once it is a day old
+      if (r === 'roomIndex') return code ? (value == null ? host(code) || expired(code) : host(code) && typeof value === 'number' && value <= Date.now() + 90000000 && value > Date.now() - 600000) : false;
+      if (r === 'rooms' && code && !area) return value == null && (host(code) || expired(code));   // the host, or anyone once its time is up
       if (r !== 'rooms' || !area) return false;
       if (area === 'meta') return who === 'host' ? (db.read(path) == null ? value === uid : host(code)) : (host(code) || pendingHost === uid);
       if (area === 'players') return who === uid || host(code) || pendingHost === uid;

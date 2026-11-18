@@ -77,7 +77,8 @@ against two bots, rolling, walking and entering rooms. The plan and progress are
 
 ## Old rooms are cleaned up
 
-Realtime Database has no expiry, so every new room also writes its creation time to `roomIndex/<code>`. Whoever
-creates or joins a room first deletes every room older than 24 hours (the rules in `database.rules.json` allow that
-delete only once the index says a day has passed). Republish the rules after changing them. Rooms made before this
-change have no index entry; delete the `rooms` node once in the Firebase console to clear them.
+Realtime Database has no expiry, so every room has a "delete after" time in `roomIndex/<code>`: 3 hours for a lobby,
+24 hours once a game has started, 2 hours after the case is closed (the host's device sets it). Whoever creates or joins
+a room first deletes every room whose time is up; the rules in `database.rules.json` allow that delete only once the
+time has passed. Republish the rules after changing them. If the rules are not republished the app still works, the
+room just is not indexed and will not be cleaned up.

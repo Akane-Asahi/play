@@ -99,14 +99,15 @@ export function startApp({ net, doc, win, delays }) {
     return name;
   }
 
-  // Rooms are deleted a day after they were made. Nothing runs on a timer, so whoever opens or joins a room
-  // clears out every old one (the oldest-first list lives in roomIndex).
-  const DAY = 24 * 3600 * 1000;
+  // Every room has a "delete after" time in roomIndex: 3 hours for a lobby, 24 hours once a game is running,
+  // 2 hours after the case is closed. Nothing runs on a timer, so whoever opens or joins a room clears out the expired ones.
+  const HOUR = 3600 * 1000, LIFE = { lobby: 3 * HOUR, playing: 24 * HOUR, done: 2 * HOUR };
+  const setExpiry = async (code, kind) => { try { await net.set('roomIndex/' + code, Date.now() + LIFE[kind]); } catch (e) { /* best effort */ } };
   async function sweep() {
     try {
       const idx = (await net.get('roomIndex')) || {};
       for (const code of Object.keys(idx)) {
-        if (typeof idx[code] !== 'number' || idx[code] >= Date.now() - DAY) continue;
+        if (typeof idx[code] !== 'number' || idx[code] >= Date.now()) continue;
         try { await net.remove('rooms/' + code); await net.remove('roomIndex/' + code); } catch (e) { /* somebody else got there first */ }
       }
     } catch (e) { /* cleaning up is best effort */ }
@@ -121,7 +122,7 @@ export function startApp({ net, doc, win, delays }) {
       'meta/host': uid, 'meta/edition': ui.edition, 'meta/status': 'lobby', 'meta/helper': true, 'meta/mode': mode === 'full' ? 'full' : 'fast', 'meta/createdAt': Date.now(),
       ['players/' + uid]: { name, seat: 0, bot: false },
     });
-    await net.set('roomIndex/' + code, Date.now());
+    await setExpiry(code, 'lobby');
     enterRoom(code);
   }
 
@@ -181,6 +182,7 @@ export function startApp({ net, doc, win, delays }) {
     const up = { 'meta/status': 'playing', 'meta/startedAt': Date.now(), 'secret/envelope': envelope, game: E.newGame(ord, meta.mode === 'full' ? { mode: 'full', rc0: D.CS[2] } : null), shown: null };
     ord.forEach((pid, i) => { up['hands/' + pid] = hands[pid]; up['players/' + pid + '/handSize'] = sizes[i]; });
     await net.update(room(), up);
+    await setExpiry(roomCode, 'playing');
   }
 
   async function backToLobby() {
@@ -188,6 +190,7 @@ export function startApp({ net, doc, win, delays }) {
     const up = { 'meta/status': 'lobby', game: null, secret: null, shown: null };
     order().forEach((pid) => { up['hands/' + pid] = null; up['players/' + pid + '/handSize'] = null; });
     await net.update(room(), up);
+    await setExpiry(roomCode, 'lobby');
   }
 
   // ---------- my moves ----------
@@ -305,6 +308,7 @@ export function startApp({ net, doc, win, delays }) {
   }
   async function hostTick() {
     if (!isHost()) return;
+    if (game && game.over && meta && ui.doneKey !== roomCode + ':' + (meta.startedAt || 0)) { ui.doneKey = roomCode + ':' + (meta.startedAt || 0); setExpiry(roomCode, 'done'); }
     if (hostBusy) { hostDirty = true; return; }   // something changed while a bot was thinking: look again after
     hostBusy = true; hostDirty = false;
     let acted = false;

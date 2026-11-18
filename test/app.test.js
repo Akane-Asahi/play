@@ -416,7 +416,7 @@ async function play(db, cs, code, plan, until) {
   const keep = await lobby(db, ['k1', 'k2', 'k3'], []);
   const oldCode = old.code, keepCode = keep.code;
   assert(db.read('roomIndex/' + oldCode) > 0 && db.read('roomIndex/' + keepCode) > 0, 'every room is indexed');
-  db.write('roomIndex/' + oldCode, Date.now() - 25 * 3600 * 1000);           // pretend it was made yesterday
+  db.write('roomIndex/' + oldCode, Date.now() - 1000);                        // its time is up
   const fresh = open(db, 'n1'); await wait(5);
   fresh.type('name', 'New'); fresh.click('[data-act=create]'); fresh.click('[data-act=mk][data-m=fast]'); await wait(20);
   assert.equal(db.read('rooms/' + oldCode), null, 'the old room is gone');
@@ -426,6 +426,20 @@ async function play(db, cs, code, plan, until) {
   // a stranger cannot delete a recent room
   await assert.rejects(db.client('stranger').remove('rooms/' + keepCode));
   console.log('K ok: rooms older than 24 hours are swept');
+}
+// L: how long a room lives: a lobby 3 hours, a running game 24 hours, a finished one 2 hours
+{
+  const db = new FakeDb(), H = 3600000;
+  const { cs, code } = await lobby(db, ['h1', 'h2'], ['Sir']);
+  const near = (v, h) => Math.abs(v - Date.now() - h * H) < 5 * 60000;
+  assert(near(db.read('roomIndex/' + code), 24), 'a game that has started is kept 24 hours');
+  const end = await play(db, cs, code);
+  await wait(30);
+  assert(end.over);
+  assert(near(db.read('roomIndex/' + code), 2), 'a finished game is kept 2 hours');
+  cs[0].click('[data-act=again]'); await wait(10);
+  assert(near(db.read('roomIndex/' + code), 3), 'back in the lobby: 3 hours again');
+  console.log('L2 ok: running 24h, finished 2h, lobby 3h');
 }
 console.log('app tests ok');
 process.exit(0);

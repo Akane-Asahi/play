@@ -2,7 +2,7 @@
   "rules": {
     "rooms": {
       "$code": {
-        ".write": "auth != null && !newData.exists() && (data.child('meta/host').val() === auth.uid || root.child('roomIndex/' + $code).val() < now - 86400000)",
+        ".write": "auth != null && !newData.exists() && (root.child('rooms/' + $code + '/meta/host').val() === auth.uid || root.child('roomIndex/' + $code).val() < now)",
         "meta": {
           ".read": "auth != null",
           "$field": {
@@ -43,7 +43,7 @@
     "roomIndex": {
       ".read": "auth != null",
       "$code": {
-        ".write": "auth != null && ((!newData.exists() && (root.child('rooms/' + $code + '/meta/host').val() === auth.uid || data.val() < now - 86400000)) || (!data.exists() && newData.isNumber() && newData.val() <= now + 300000 && newData.val() >= now - 600000))"
+        ".write": "auth != null && ((!newData.exists() && (root.child('rooms/' + $code + '/meta/host').val() === auth.uid || data.val() < now)) || (root.child('rooms/' + $code + '/meta/host').val() === auth.uid && newData.isNumber() && newData.val() <= now + 90000000 && newData.val() > now - 600000))"
       }
     }
   }
