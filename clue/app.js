@@ -713,13 +713,17 @@ export function startApp({ net, doc, win, delays, load3d }) {
     }
     // one stage per player who is asked; the last one ends with the outcome ("Showed" / "Passed") on the same player
     const lastR = P.live ? null : (P.e.resp || [])[P.list.length - 1];
-    P.stages = P.kind === 's'
-      ? P.list.map((p, k) => ({ i: k, label: 'Showing…' })).concat([{ i: P.list.length - 1, label: lastR && lastR.r !== 'showed' ? 'Passed' : 'Showed', fin: true }])
-      : [{ i: 0, label: 'Accusing…' }, { i: 0, label: 'Wrong', fin: true }];
+    // Everyone who is asked goes "Showing…", and whoever has nothing to show gets a "Passed" of their own before the next
+    // player is asked. (A player's stage is 2 * their place in line.)
+    P.stages = [];
+    if (P.kind === 's') {
+      P.list.forEach((p, k) => { P.stages.push({ i: k, label: 'Showing…' }); if (k < P.list.length - 1) P.stages.push({ i: k, label: 'Passed' }); });
+      P.stages.push({ i: P.list.length - 1, label: lastR && lastR.r !== 'showed' ? 'Passed' : 'Showed', fin: true });
+    } else P.stages = [{ i: 0, label: 'Accusing…' }, { i: 0, label: 'Wrong', fin: true }];
     const items = P.kind === 's' ? P.list : [P.by];
 
     // where the replay is: it catches up with the real state one stage at a time
-    const T = P.live ? P.at : P.stages.length - 1, now = Date.now();
+    const T = P.live ? (P.kind === 's' ? 2 * P.at : P.at) : P.stages.length - 1, now = Date.now();
     let R = ui.rp;
     if (!R || R.key !== P.key) R = ui.rp = { key: P.key, d: P.live ? T : 0, prev: P.live ? T : 0, since: now, first: now };
     while (R.d < T && now - R.since >= D0.min) { R.prev = R.d; R.d++; R.since = now; }

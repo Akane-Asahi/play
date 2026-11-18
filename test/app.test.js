@@ -340,7 +340,10 @@ async function play(db, cs, code, plan, until) {
   assert(!h2.q('[data-act=pass]'), 'her own turn to answer has not arrived on screen yet');
   const fan = h2.q('.mcard .fan'), car = h2.q('.mcard .car');
   assert(fan && car && (fan.compareDocumentPosition(car) & 4), 'names are under the cards');
-  await wait(320);
+  await wait(260);
+  assert.equal(h2.q('.mcard .ci.on .cp').textContent, 'Sir', 'Sir is still the one in the pill…');
+  assert.equal((h2.q('.mcard .ci.on .cl .ln') || h2.q('.mcard .ci.on .cl')).textContent, 'Passed', '…and it says he passed before anyone else is asked');
+  await wait(300);
   assert.equal(h2.q('.mcard .ci.on .cp').textContent, 'You', 'then it is her turn');
   h2.click('[data-act=pass]'); await wait(300);
   assert.equal(db.read('rooms/' + code + '/game').phase, 'end');
