@@ -99,16 +99,17 @@ export function boardSvg(o) {
   }
   // rooms (names go on top of everything, so a tall picture never hides a neighbour's name)
   let labels = '';
-  // The room of the player whose turn it is is drawn last, so it sits on top of any neighbour that overlaps it.
-  const top1 = (k) => (o.turn != null && o.pos[o.turn] === B.inRoom(k) ? 1 : 0);
-  const drawOrder = Array.from({ length: B.ROOMS }, (_, k) => k).sort((a, b) => top1(a) - top1(b) || a - b);
+  // Rooms keep their natural order (Kitchen at the back ... Study at the front). When the player whose turn it is
+  // stands inside a room, every other room fades back so nothing overlaps what is happening there.
+  const focus = o.turn != null && o.pos[o.turn] != null && o.pos[o.turn] < 0 ? -o.pos[o.turn] - 1 : -1;
+  const drawOrder = Array.from({ length: B.ROOMS }, (_, k) => k);
   for (const k of drawOrder) {
     const r = B.roomRect(k), x0 = r.x, y0 = r.y;
     s += poly(quad(x0, y0, 4, 4), 'fill="' + FLOORS[k] + '"');
     const art = ROOM_ART[String(o.roomNames[k] || '').toLowerCase().replace(/[^a-z]/g, '')];
     if (art) {
       const w = art.w, h = w * art.ratio, cx = P(x0 + 2, y0 + 2)[0], by = P(x0 + 4, y0 + 4)[1] + 9;
-      s += '<image href="' + art.src + '" x="' + (cx - w / 2).toFixed(1) + '" y="' + (by - h).toFixed(1) + '" width="' + w + '" height="' + h.toFixed(1) + '" pointer-events="none"/>';
+      s += '<image href="' + art.src + '" x="' + (cx - w / 2).toFixed(1) + '" y="' + (by - h).toFixed(1) + '" width="' + w + '" height="' + h.toFixed(1) + '"' + (focus >= 0 && focus !== k ? ' opacity=".3"' : '') + ' pointer-events="none"/>';
       const c = P(x0 + 2, y0 + 2);
       labels += '<text class="rl" x="' + c[0] + '" y="' + (c[1] + 22) + '">' + esc(o.roomNames[k] || '') + '</text>';
       continue;
