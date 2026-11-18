@@ -99,21 +99,36 @@ export function startApp({ net, doc, win, delays }) {
     return name;
   }
 
+  // Rooms are deleted a day after they were made. Nothing runs on a timer, so whoever opens or joins a room
+  // clears out every old one (the oldest-first list lives in roomIndex).
+  const DAY = 24 * 3600 * 1000;
+  async function sweep() {
+    try {
+      const idx = (await net.get('roomIndex')) || {};
+      for (const code of Object.keys(idx)) {
+        if (typeof idx[code] !== 'number' || idx[code] >= Date.now() - DAY) continue;
+        try { await net.remove('rooms/' + code); await net.remove('roomIndex/' + code); } catch (e) { /* somebody else got there first */ }
+      }
+    } catch (e) { /* cleaning up is best effort */ }
+  }
   async function createRoom(mode) {
     const name = needName();
     uid = await net.signIn();
+    await sweep();
     let code = randomCode();
     for (let i = 0; i < 5 && (await net.get('rooms/' + code + '/meta')); i++) code = randomCode();
     await net.update('rooms/' + code, {
       'meta/host': uid, 'meta/edition': ui.edition, 'meta/status': 'lobby', 'meta/helper': true, 'meta/mode': mode === 'full' ? 'full' : 'fast', 'meta/createdAt': Date.now(),
       ['players/' + uid]: { name, seat: 0, bot: false },
     });
+    await net.set('roomIndex/' + code, Date.now());
     enterRoom(code);
   }
 
   async function joinRoom(code) {
     const name = needName();
     uid = await net.signIn();
+    await sweep();
     const m = await net.get('rooms/' + code + '/meta');
     if (!m) throw new Error('No room with that code.');
     const list = (await net.get('rooms/' + code + '/players')) || {};
@@ -866,7 +881,7 @@ export function startApp({ net, doc, win, delays }) {
       case 'again': run(backToLobby); break;
       case 'cancel': ui.cancel = true; render(); break;
       case 'cancel-no': ui.cancel = false; render(); break;
-      case 'cancel-yes': run(async () => { if (!isHost()) return; const code = roomCode; await net.remove('rooms/' + code); win.location.href = win.location.pathname; }); break;
+      case 'cancel-yes': run(async () => { if (!isHost()) return; const code = roomCode; await net.remove('roomIndex/' + code); await net.remove('rooms/' + code); win.location.href = win.location.pathname; }); break;
       case 'home': win.location.href = win.location.pathname; break;
       case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
       case 'next': ui.seen++; render(); break;

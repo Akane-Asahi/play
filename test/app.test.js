@@ -409,5 +409,23 @@ async function play(db, cs, code, plan, until) {
   assert(c.msg() === '' && !c.q('#msg [data-act=msg-close]'), 'the cross dismisses it');
   console.log('N ok: error message has a cross');
 }
+// K: rooms older than a day are swept away when anyone opens or joins a room
+{
+  const db = new FakeDb();
+  const old = await lobby(db, ['h1', 'h2', 'h3'], []);
+  const keep = await lobby(db, ['k1', 'k2', 'k3'], []);
+  const oldCode = old.code, keepCode = keep.code;
+  assert(db.read('roomIndex/' + oldCode) > 0 && db.read('roomIndex/' + keepCode) > 0, 'every room is indexed');
+  db.write('roomIndex/' + oldCode, Date.now() - 25 * 3600 * 1000);           // pretend it was made yesterday
+  const fresh = open(db, 'n1'); await wait(5);
+  fresh.type('name', 'New'); fresh.click('[data-act=create]'); fresh.click('[data-act=mk][data-m=fast]'); await wait(20);
+  assert.equal(db.read('rooms/' + oldCode), null, 'the old room is gone');
+  assert.equal(db.read('roomIndex/' + oldCode), null, 'and its index entry');
+  assert(db.read('rooms/' + keepCode), 'a recent room is left alone');
+  assert(db.read('roomIndex/' + fresh.app.state().roomCode), 'the new room is indexed');
+  // a stranger cannot delete a recent room
+  await assert.rejects(db.client('stranger').remove('rooms/' + keepCode));
+  console.log('K ok: rooms older than 24 hours are swept');
+}
 console.log('app tests ok');
 process.exit(0);

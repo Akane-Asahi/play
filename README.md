@@ -74,3 +74,10 @@ A 3D version of the full game with a toy-diorama look lives in `Clue3D/` (`/Clue
 rules (`clue/engine.js`, `clue/board.js`) drawn with three.js, still with no build step. Today it is a sandbox: you
 against two bots, rolling, walking and entering rooms. The plan and progress are on the task board at
 `Clue3D/tasks.html`. See `Clue3D/README.md`.
+
+## Old rooms are cleaned up
+
+Realtime Database has no expiry, so every new room also writes its creation time to `roomIndex/<code>`. Whoever
+creates or joins a room first deletes every room older than 24 hours (the rules in `database.rules.json` allow that
+delete only once the index says a day has passed). Republish the rules after changing them. Rooms made before this
+change have no index entry; delete the `rooms` node once in the Firebase console to clear them.
