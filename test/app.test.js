@@ -61,6 +61,7 @@ function act(c, plan) {
   }
   if (c.q('[data-act=suggest]')) {
     if (c.q('.iso')) {                                  // full game: the room is the one I am standing in
+      if (!c.q('.sheet')) c.click('[data-act=sheet][data-s=notes]');
       [0, 1].forEach((k) => { const o = c.qa('[data-act=pick][data-k="' + k + '"]'); c.click(o[Math.floor(Math.random() * o.length)]); });
       return c.click('[data-act=suggest]');
     }

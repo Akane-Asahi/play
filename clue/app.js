@@ -421,7 +421,7 @@ export function startApp({ net, doc, win, delays }) {
       }
       h += '</div>';
     });
-    return h + '</aside>';
+    return h + (hasMap() ? cancelHtml() : '') + '</aside>';
   }
 
   function lastResultHtml(D, mine) {
@@ -695,8 +695,24 @@ export function startApp({ net, doc, win, delays }) {
     if (!E.isFull(g) || !g.pos) return '';
     const go = g.phase === 'move' && g.turn === uid && g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null;
     const roomNames = Array.from({ length: B.ROOMS }, (_, k) => D.CARDS[g.rc0 + k]);
-    return '<section class="card boardc">' + boardSvg({ pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go }) +
-      '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div></section>';
+    return '<div class="bmap">' + boardSvg({ pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go }) +
+      '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div></div>';
+  }
+
+  // ---------- the full game: the map is the whole screen ----------
+  const hasMap = () => !!(game && E.isFull(game) && game.pos);
+  const ICON_NOTES = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 3h8l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12h6M10 16h6M10 8h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const ICON_TURNS = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // Round buttons bottom right, sitting just above the move buttons (they share one fixed column).
+  function hudHtml(D) {
+    const notes = notesHtml(D) ? '<button class="fab' + (ui.sheet === 'notes' ? ' on' : '') + '" data-act="sheet" data-s="notes" aria-label="Your notes">' + ICON_NOTES + '</button>' : '';
+    return '<div class="hud"><div class="fabs"><button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div>' + floatHtml(D) + '</div>';
+  }
+  function sheetHtml(D) {
+    if (!ui.sheet) return '';
+    const notes = ui.sheet === 'notes';
+    return '<div class="sbackdrop" data-act="sheet" data-s=""></div><aside class="sheet" role="dialog" aria-label="' + (notes ? 'Your notes' : 'Turns') + '"><button class="x sx" data-act="sheet" data-s="" aria-label="Close">×</button>' +
+      '<div class="sbody">' + (notes ? notesHtml(D) : turnsHtml(D)) + '</div></aside>';
   }
 
   // Only the host can cancel; it deletes the room for everyone.
@@ -714,6 +730,8 @@ export function startApp({ net, doc, win, delays }) {
       const closed = ui.finaleClosed === (meta.startedAt || 0) + ':' + game.over.winner;
       const bar = '<section class="card finbar"><div class="muted">' + (game.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div><div class="who">' + esc(nmFull(game.over.winner)) + '</div>' +
         '<div class="row"><button class="btn grow" data-act="finale-open">Show result</button>' + (isHost() ? '<button class="btn ghost grow" data-act="again">Play again</button>' : '') + '<button class="btn ghost grow" data-act="home">Home</button></div></section>';
+      if (hasMap()) return '<div class="mapfull">' + (closed ? bar : '') + boardHtml(D) + '</div>' + hudHtml(D) + sheetHtml(D) +
+        (closed ? '' : '<div class="modal"><div class="mcard finale" role="dialog" aria-modal="true"><button class="mclose" data-act="finale-close" aria-label="Close">×</button>' + finaleHtml(D) + '</div></div>');
       return (closed ? bar : '') + boardHtml(D) + turnsHtml(D) +
         (closed ? '' : '<div class="modal"><div class="mcard finale" role="dialog" aria-modal="true"><button class="mclose" data-act="finale-close" aria-label="Close">×</button>' + finaleHtml(D) + '</div></div>');
     }
@@ -723,6 +741,7 @@ export function startApp({ net, doc, win, delays }) {
       const k = log.length + ':' + game.pos[uid];
       if (ui.selKey !== k) { ui.selKey = k; ui.sel[2] = hereCard(); }
     }
+    if (hasMap()) return '<div class="mapfull"><section class="card act">' + actionHtml(D) + '</section>' + boardHtml(D) + '</div>' + hudHtml(D) + sheetHtml(D) + modalHtml(D);
     const h = '<section class="card act">' + actionHtml(D) + '</section>' + boardHtml(D);
     return h + notesHtml(D) + turnsHtml(D) + cancelHtml() + floatHtml(D) + modalHtml(D);
   }
@@ -741,6 +760,9 @@ export function startApp({ net, doc, win, delays }) {
     const inGame = !!(roomCode && meta && meta.status === 'playing' && players[uid] && game);
     const ttl = doc.querySelector('header h1');
     if (ttl) ttl.innerHTML = inGame && !game.over ? 'Turn ' + (E.logOf(game).length + 1) + ' <span class="tdot">•</span> <span class="tname">' + esc(nm(game.turn)) + '</span>' : 'Clues';
+    doc.body.classList.toggle('fullmap', inGame && hasMap());
+    const hd = doc.querySelector('header');
+    if (hd && hd.offsetHeight) doc.documentElement.style.setProperty('--hh', hd.offsetHeight + 'px');
     const pb = $('players-btn');
     if (pb) pb.hidden = !inGame;
     const html = h + (inGame ? playersPanel() : '');
@@ -806,6 +828,7 @@ export function startApp({ net, doc, win, delays }) {
       case 'finale-close': ui.finaleClosed = (meta.startedAt || 0) + ':' + game.over.winner; render(); break;
       case 'finale-open': ui.finaleClosed = null; render(); break;
       case 'players': ui.plOpen = !ui.plOpen; render(); break;
+      case 'sheet': ui.sheet = el.dataset.s && ui.sheet !== el.dataset.s ? el.dataset.s : null; render(); break;
       case 'pexp': ui.plExp[el.dataset.p] = !ui.plExp[el.dataset.p]; render(); break;
       case 'suggest': run(doSuggest); break;
       case 'accuse': ui.confirm = true; render(); break;
