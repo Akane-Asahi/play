@@ -4,7 +4,13 @@ import * as E from './engine.js';
 import * as B from './board.js';
 import { boardSvg, dieSvg, SEAT_COLORS } from './boardview.js';
 
-export function startApp({ net, doc, win, delays }) {
+// Game modes chosen in the lobby. '3d' is the full game (same rules, same room) with the mansion drawn in 3D.
+const MODES = ['fast', 'full', '3d'];
+const modeOf = (m) => (MODES.includes(m) ? m : 'fast');
+const isBoardMode = (m) => m === 'full' || m === '3d';
+
+// load3d (optional): () => import(...) of the 3D board view. Without it, or when WebGL is missing, a 3D room shows the 2D map.
+export function startApp({ net, doc, win, delays, load3d }) {
   const S = win.ClueSolver;
   const D0 = { bot: 3000, none: 900, min: 3000, ...(delays || {}) };   // min: how long each state stays on screen
   const NAME_KEY = 'clues-play-name';
@@ -119,7 +125,7 @@ export function startApp({ net, doc, win, delays }) {
     let code = randomCode();
     for (let i = 0; i < 5 && (await net.get('rooms/' + code + '/meta')); i++) code = randomCode();
     await net.update('rooms/' + code, {
-      'meta/host': uid, 'meta/edition': ui.edition, 'meta/status': 'lobby', 'meta/helper': true, 'meta/mode': mode === 'full' ? 'full' : 'fast', 'meta/createdAt': Date.now(),
+      'meta/host': uid, 'meta/edition': ui.edition, 'meta/status': 'lobby', 'meta/helper': true, 'meta/mode': modeOf(mode), 'meta/createdAt': Date.now(),
       ['players/' + uid]: { name, seat: 0, bot: false },
     });
     await setExpiry(code, 'lobby');
@@ -179,7 +185,7 @@ export function startApp({ net, doc, win, delays }) {
     const seed = win.crypto.getRandomValues(new Uint32Array(1))[0];
     const sizes = S.defaultHands(ord.length, D.N - 3);
     const { envelope, hands } = E.deal(D, ord, sizes, S.mulberry32(seed));
-    const up = { 'meta/status': 'playing', 'meta/startedAt': Date.now(), 'secret/envelope': envelope, game: E.newGame(ord, meta.mode === 'full' ? { mode: 'full', rc0: D.CS[2] } : null), shown: null };
+    const up = { 'meta/status': 'playing', 'meta/startedAt': Date.now(), 'secret/envelope': envelope, game: E.newGame(ord, isBoardMode(meta.mode) ? { mode: 'full', rc0: D.CS[2] } : null), shown: null };
     ord.forEach((pid, i) => { up['hands/' + pid] = hands[pid]; up['players/' + pid + '/handSize'] = sizes[i]; });
     await net.update(room(), up);
     await setExpiry(roomCode, 'playing');
@@ -344,7 +350,8 @@ export function startApp({ net, doc, win, delays }) {
       '</select>' + (ui.choosing
         ? '<p class="muted" style="margin-top:12px">What kind of game?</p><div class="modes">' +
           '<button class="mode" data-act="mk" data-m="fast"><b>Fast game</b><span>Cards only. Take turns making suggestions, no board.</span></button>' +
-          '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Roll the dice, walk the mansion and suggest in the room you enter.</span></button></div>'
+          '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Roll the dice, walk the mansion and suggest in the room you enter.</span></button>' +
+          '<button class="mode" data-act="mk" data-m="3d"><b>3D game</b><span>The full game with the mansion in 3D. Same rules, same room.</span></button></div>'
         : '<button class="btn" data-act="create">Create room</button>') + '</section>' +
       '<section class="card"><h2>Join a room</h2><p class="muted">Type the code a friend sent you, or open their link.</p>' +
       '<input type="text" id="code" maxlength="5" placeholder="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
@@ -371,12 +378,12 @@ export function startApp({ net, doc, win, delays }) {
         '</div><p class="muted">Bots play on your device, so keep this page open during the game.</p></section>';
       h += '<section class="card"><div class="switch"><div><b>Notes sheet for everyone</b><div class="muted">Each player gets a sheet to tick and cross by hand as they work out the case.</div></div>' +
         '<button class="tog' + (meta.helper ? ' on' : '') + '" data-act="helper" aria-label="Toggle notes"></button></div></section>';
-      h += '<section class="card"><h2>Game</h2><div class="modes">' + [['fast', 'Fast game', 'Cards only, no board.'], ['full', 'Full game', 'Dice, the mansion and rooms.']].map((m) =>
+      h += '<section class="card"><h2>Game</h2><div class="modes">' + [['fast', 'Fast game', 'Cards only, no board.'], ['full', 'Full game', 'Dice, the mansion and rooms.'], ['3d', '3D game', 'The full game, the mansion in 3D.']].map((m) =>
         '<button class="mode' + ((meta.mode || 'fast') === m[0] ? ' on' : '') + '" data-act="setmode" data-m="' + m[0] + '"><b>' + m[1] + '</b><span>' + m[2] + '</span></button>').join('') + '</div></section>';
       h += '<button class="btn" data-act="start"' + (ord.length < E.MIN_PLAYERS ? ' disabled' : '') + '>Start game</button>' +
         (ord.length < E.MIN_PLAYERS ? '<p class="muted center">You need at least ' + E.MIN_PLAYERS + ' players. Add a bot or invite a friend.</p>' : '');
     } else {
-      h += '<p class="muted center">' + (meta.mode === 'full' ? 'Full game with dice and the mansion. ' : 'Fast game. ') + 'Waiting for ' + esc(nmFull(meta.host)) + ' to start the game.</p>';
+      h += '<p class="muted center">' + (meta.mode === '3d' ? '3D game: the full game with the mansion in 3D. ' : meta.mode === 'full' ? 'Full game with dice and the mansion. ' : 'Fast game. ') + 'Waiting for ' + esc(nmFull(meta.host)) + ' to start the game.</p>';
     }
     return h;
   }
@@ -749,13 +756,47 @@ export function startApp({ net, doc, win, delays }) {
   }
 
   // The mansion, for the full game.
-  function boardHtml(D) {
+  function boardState(D) {
     const g = game, ord = order();
-    if (!E.isFull(g) || !g.pos) return '';
     const go = g.phase === 'move' && g.turn === uid && g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null;
     const roomNames = Array.from({ length: B.ROOMS }, (_, k) => D.CARDS[g.rc0 + k]);
-    return '<div class="bmap">' + boardSvg({ pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go }) +
-      '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div></div>';
+    return { pos: g.pos, order: ord, me: uid, turn: g.over ? null : g.turn, out: g.out, roomNames, go, dice: g.dice || null, phase: g.phase };
+  }
+  function legendHtml(D) {
+    const g = game, ord = order();
+    return '<div class="legend">' + ord.map((p, i) => '<span class="lg' + (g.turn === p ? ' on' : '') + '"><i style="background:' + SEAT_COLORS[i % SEAT_COLORS.length] + '"></i>' + esc(nm(p)) + ' <em>' + esc(D.CARDS[i]) + '</em></span>').join('') + '</div>';
+  }
+  function boardHtml(D) {
+    const g = game;
+    if (!E.isFull(g) || !g.pos) return '';
+    const st = boardState(D);
+    if (want3d()) {                                   // the 3D game: a canvas is mounted into #b3d-host after each render
+      ensure3d();
+      if (ui.v3 !== false) {
+        ui.v3state = st;
+        return '<div class="bmap b3d"><div class="b3d-view" id="b3d-host">' + (ui.v3 ? '' : '<p class="muted center b3d-wait">Loading the 3D mansion…</p>') + '</div>' + legendHtml(D) + '</div>';
+      }
+    }
+    return '<div class="bmap">' + boardSvg({ pos: st.pos, order: st.order, me: uid, turn: st.turn, out: st.out, roomNames: st.roomNames, go: st.go }) + legendHtml(D) + '</div>';
+  }
+
+  // ---------- the 3D board (3D game only) ----------
+  // ui.v3: undefined = not asked for yet, null = loading, false = not available (the 2D map is shown instead), else the view.
+  const want3d = () => !!(load3d && meta && meta.mode === '3d' && game && E.isFull(game) && game.pos);
+  function ensure3d() {
+    if (ui.v3 !== undefined) return;
+    ui.v3 = null;
+    Promise.resolve().then(load3d)
+      .then((m) => { ui.v3 = m.createBoardView({ doc, win, onMove: (d) => run(() => doMove(d)) }); })
+      .catch(() => { ui.v3 = false; })     // no WebGL or the files did not load: carry on with the flat map
+      .then(() => render());
+  }
+  function sync3d() {
+    const host = $('b3d-host');
+    if (!host || !ui.v3 || !ui.v3state) return;
+    if (ui.v3.el.parentNode !== host) { host.textContent = ''; host.appendChild(ui.v3.el); }
+    if (ui.v3key !== meta.startedAt) { ui.v3key = meta.startedAt; ui.v3.reset(); }
+    ui.v3.update(ui.v3state);
   }
 
   // ---------- the full game: the map is the whole screen ----------
@@ -826,6 +867,7 @@ export function startApp({ net, doc, win, delays }) {
     if (pb) pb.hidden = !inGame;
     const html = h + (inGame ? playersPanel() : '');
     if (html !== ui.lastHtml) { $('view').innerHTML = html; ui.lastHtml = html; }    // same picture: leave it alone, so nothing re-animates
+    sync3d();
     const mk = (ui.info ? 'i' : 'w') + msg;
     if (ui.msgKey !== mk) {                                    // only touch it when it changes, so it doesn't re-animate
       ui.msgKey = mk;
@@ -866,7 +908,7 @@ export function startApp({ net, doc, win, delays }) {
       case 'msg-close': msg = ''; ui.info = false; render(); break;
       case 'create': try { msg = ''; needName(); ui.choosing = true; } catch (err) { msg = err.message; } render(); break;
       case 'mk': run(() => createRoom(el.dataset.m)); break;
-      case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), el.dataset.m === 'full' ? 'full' : 'fast') : null)); break;
+      case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), modeOf(el.dataset.m)) : null)); break;
       case 'roll': run(doRoll); break;
       case 'pass': run(doPass); break;
       case 'passage': run(doPassage); break;

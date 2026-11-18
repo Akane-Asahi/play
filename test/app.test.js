@@ -8,13 +8,14 @@ const S = loadSolver();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let DL = { bot: 0, none: 0, min: 0 };          // delays for every page: no waiting, unless a test says otherwise
+let L3D;                                       // fake loader for the 3D board view, set by the 3D tests
 function open(db, uid, query) {
   const dom = new JSDOM('<header><span class="hside"><button id="players-btn" data-act="players" hidden></button></span><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
     { url: 'https://example.test/play/clue/' + (query || ''), pretendToBeVisual: true });
   const win = dom.window;
   win.ClueSolver = S;
   if (!win.crypto || !win.crypto.getRandomValues) Object.defineProperty(win, 'crypto', { value: webcrypto });
-  const app = startApp({ net: db.client(uid), doc: win.document, win, delays: DL });
+  const app = startApp({ net: db.client(uid), doc: win.document, win, delays: DL, load3d: L3D });
   const q = (sel) => win.document.querySelector(sel), qa = (sel) => Array.from(win.document.querySelectorAll(sel));
   const click = (sel) => { const el = typeof sel === 'string' ? q(sel) : sel; assert(el, 'missing ' + sel + ' for ' + uid + '\n' + q('#view').innerHTML.slice(0, 400)); el.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); };
   const type = (id, v) => { const el = q('#' + id); assert(el, 'missing #' + id); el.value = v; el.dispatchEvent(new win.Event('input', { bubbles: true })); };
@@ -26,7 +27,7 @@ async function lobby(db, humans, bots, names, mode) {
   names = names || {};
   const host = open(db, humans[0]);
   await wait(5);
-  host.type('name', names[humans[0]] || 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m=' + (mode || 'fast') + ']'); await wait(10);
+  host.type('name', names[humans[0]] || 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m="' + (mode || 'fast') + '"]'); await wait(10);
   const code = host.app.state().roomCode;
   assert.match(code, /^[A-Z0-9]{5}$/);
   assert(host.q('#share').value.endsWith('?room=' + code));
@@ -440,6 +441,54 @@ async function play(db, cs, code, plan, until) {
   cs[0].click('[data-act=again]'); await wait(10);
   assert(near(db.read('roomIndex/' + code), 3), 'back in the lobby: 3 hours again');
   console.log('L2 ok: running 24h, finished 2h, lobby 3h');
+}
+// O: 3D game mode: same game as the full game, chosen in the lobby, drawn by the 3D board view
+{
+  const db = new FakeDb();
+  const views = new Map(), calls = [];
+  L3D = async () => ({ createBoardView: ({ doc, onMove }) => {
+    const el = doc.createElement('div'); el.id = 'fake3d';
+    views.set(doc, { onMove });
+    return { el, update: (st) => calls.push(st), reset: () => calls.push('reset') };
+  } });
+  // the create screen offers three kinds of game
+  const probe = open(db, 'p1'); await wait(5);
+  probe.type('name', 'Pat'); probe.click('[data-act=create]');
+  assert.deepEqual(probe.qa('[data-act=mk]').map((b) => b.dataset.m), ['fast', 'full', '3d'], 'Fast, Full and 3D to choose from');
+  // the host can switch a lobby to 3D, and everybody sees it
+  const host = open(db, 'h1'); await wait(5);
+  host.type('name', 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m="fast"]'); await wait(10);
+  const code = host.app.state().roomCode;
+  host.click('[data-act=bot][data-n=Sir]'); await wait(5); host.click('[data-act=bot][data-n=Dada]'); await wait(5);
+  const h2 = open(db, 'h2', '?room=' + code); await wait(5);
+  h2.type('name', 'Hana'); h2.click('[data-act=join]'); await wait(10);
+  const cs = [host, h2];
+  cs[0].click('[data-act=setmode][data-m="3d"]'); await wait(10);
+  assert.equal(db.read('rooms/' + code + '/meta/mode'), '3d');
+  assert(cs[0].q('[data-act=setmode][data-m="3d"].on') && /3D game/.test(cs[1].text()), 'the lobby shows the 3D game');
+  cs[0].click('[data-act=start]'); await wait(30);
+  let g = db.read('rooms/' + code + '/game');
+  assert(g.mode === 'full' && g.phase === 'roll' && Object.keys(g.pos).length === 4, 'a 3D game is a full game underneath');
+  const me = cs.find((c) => c.uid === g.turn);
+  assert(me.q('#b3d-host #fake3d') && !me.q('.iso'), 'the 3D view replaces the flat map');
+  const first = calls.find((c) => c !== 'reset');
+  assert(first && first.order.length === 4 && first.roomNames.length === 9 && first.pos[g.turn] === g.pos[g.turn], 'the view is given the game state');
+  me.click('[data-act=roll]'); await wait(10);
+  const st = calls.filter((c) => c !== 'reset').pop();
+  assert(st.phase === 'move' && st.dice.length === 2 && st.go && st.go.cells.size > 0, 'after a roll the view is told where I can go');
+  const dest = st.go.cells.keys().next().value;
+  views.get(me.win.document).onMove(dest); await wait(10);            // a tap in 3D
+  g = db.read('rooms/' + code + '/game');
+  assert(g.pos[me.uid] === dest && g.phase === 'end', 'a tap in 3D moves like a tap on the flat map');
+  assert(me.q('#b3d-host #fake3d'), 'the canvas stays on the page after the screen redraws');
+  // no WebGL (or the files do not load): the same room shows the flat map instead
+  L3D = async () => { throw new Error('no WebGL'); };
+  const db2 = new FakeDb();
+  const b = await lobby(db2, ['h1', 'h2'], ['Sir'], null, '3d');
+  await wait(30);                                                   // lobby() already started the game
+  assert(b.cs.every((c) => c.q('.iso') && !c.q('#b3d-host')), 'falls back to the flat map');
+  L3D = undefined;
+  console.log('O ok: 3D game mode');
 }
 console.log('app tests ok');
 process.exit(0);

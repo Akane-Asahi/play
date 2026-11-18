@@ -23,14 +23,20 @@ export const roomCenter = (k) => { const r = B.roomRect(k); return sq(r.x + 1.5,
 function label(text) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 128;
   const g = c.getContext('2d');
-  g.font = '700 64px system-ui, -apple-system, Segoe UI, sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 14; g.strokeStyle = 'rgba(23,19,15,.85)'; g.strokeText(text, 256, 66);
-  g.fillStyle = '#fff6e4'; g.fillText(text, 256, 66);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const draw = (t) => {
+    g.clearRect(0, 0, 512, 128);
+    g.font = '700 64px system-ui, -apple-system, Segoe UI, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 14; g.strokeStyle = 'rgba(23,19,15,.85)'; g.strokeText(t, 256, 66, 500);
+    g.fillStyle = '#fff6e4'; g.fillText(t, 256, 66, 500);
+    tex.needsUpdate = true;
+  };
+  draw(text);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
   m.rotation.x = -Math.PI / 2.6;
   m.renderOrder = 10;
+  m.userData.draw = draw;
   return m;
 }
 
@@ -162,5 +168,8 @@ export function buildBoard(scene) {
     return null;
   }
 
-  return { root, rooms, showReach, setRoomModel, pick };
+  // Rooms can be named differently in other editions.
+  const setRoomName = (k, text) => { if (rooms[k] && rooms[k].name !== text) { rooms[k].name = text; rooms[k].label.userData.draw(text); } };
+
+  return { root, rooms, showReach, setRoomModel, setRoomName, pick };
 }

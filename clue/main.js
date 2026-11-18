@@ -26,4 +26,5 @@ const net = {
   },
 };
 
-startApp({ net, doc: document, win: window });
+// The 3D game mode loads the 3D board on demand, so rooms that never use it do not download three.js.
+startApp({ net, doc: document, win: window, load3d: () => import('../Clue3D/js/embed.js') });

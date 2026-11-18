@@ -277,3 +277,10 @@ main:has(.float.slim){padding-bottom:110px}
 #msg .mt{flex:1;line-height:1.3}
 #msg .mx{flex:none;width:30px;height:30px;border-radius:50%;border:0;background:rgba(0,0,0,.25);color:#fff;font-size:22px;line-height:1;padding:0;cursor:pointer}
 #msg .mx:active{background:rgba(0,0,0,.45);transform:scale(.92)}
+
+/* ---- 3D game: the canvas fills the map area, the legend sits under it ---- */
+.bmap.b3d{flex:1;display:flex;flex-direction:column;min-height:0}
+.b3d-view{flex:1;min-height:0;position:relative}
+.b3d-canvas{position:absolute;inset:0}
+.b3d-canvas canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+.b3d-wait{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0}

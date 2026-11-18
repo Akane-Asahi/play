@@ -42,5 +42,10 @@ export function makeDice(scene) {
     }));
   }
   const hide = () => dice.forEach((d) => { d.visible = false; });
-  return { throwDice, hide, dice };
+  // Show the dice already landed (no tumble), e.g. when the page is opened in the middle of a turn.
+  const setValues = (values) => dice.forEach((d, i) => {
+    const end = UP[values[i]];
+    d.visible = true; d.position.copy(rest[i]); d.rotation.set(end[0], i ? -0.4 : 0.3, end[2]);
+  });
+  return { throwDice, hide, setValues, dice };
 }

@@ -7,8 +7,9 @@ import { tween } from './anim.js';
 export const SUSPECTS = ['Scarlett', 'Mustard', 'White', 'Green', 'Peacock', 'Plum'];
 const PAWN_H = 1.05; // world units, head included
 
-export function makePawn(seat) {
-  const color = PALETTE.seats[seat % PALETTE.seats.length];
+// color: optional override (the 2D board's seat colours, so both views agree)
+export function makePawn(seat, colorOverride) {
+  const color = colorOverride || PALETTE.seats[seat % PALETTE.seats.length];
   const pawn = new THREE.Group(), figure = new THREE.Group();
   pawn.add(figure);
   const add = (geo, mat, y, x = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; figure.add(m); return m; };
@@ -19,6 +20,13 @@ export function makePawn(seat) {
   hair.rotation.x = -0.25;
   for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.035, 8, 8), toon(PALETTE.ink), 0.77, s * 0.1, 0.26); // eyes
   pawn.userData = { seat, figure };
+  return pawn;
+}
+
+// A small white arrow over a pawn: "this one is you".
+export function addMeMarker(pawn) {
+  const m = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.17, 4), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
+  m.rotation.x = Math.PI; m.position.y = 1.2; pawn.add(m);
   return pawn;
 }
 
