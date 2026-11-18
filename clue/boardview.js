@@ -88,7 +88,11 @@ export function boardSvg(o) {
   }
   // rooms (names go on top of everything, so a tall picture never hides a neighbour's name)
   let labels = '';
-  for (let k = 0; k < B.ROOMS; k++) {
+  // A room with someone in it is drawn after the empty ones, so it sits on top of any neighbour that overlaps it
+  // (the viewer's own room last of all).
+  const rank = (k) => (o.pos[o.me] === B.inRoom(k) ? 2 : o.order.some((p) => o.pos[p] === B.inRoom(k)) ? 1 : 0);
+  const drawOrder = Array.from({ length: B.ROOMS }, (_, k) => k).sort((a, b) => rank(a) - rank(b) || a - b);
+  for (const k of drawOrder) {
     const r = B.roomRect(k), x0 = r.x, y0 = r.y;
     s += poly(quad(x0, y0, 4, 4), 'fill="' + FLOORS[k] + '"');
     const art = ROOM_ART[String(o.roomNames[k] || '').toLowerCase().replace(/[^a-z]/g, '')];
