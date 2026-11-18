@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14100d">
+<title>Clues 3D · Task board</title>
+<style>
+:root{
+  --bg:#14100d; --col:#1c1612; --card:#2a221b; --card2:#30271f; --ink:#f1e8da; --mute:#9d9183; --line:#3a2e24;
+  --accent:#c19b57; --accent-ink:#1b1408; --you:#e2a35a; --ok:#6fc48f; --shadow:0 12px 34px rgba(0,0,0,.55);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+button{font:inherit;color:inherit}
+header{padding:12px 14px 6px;display:flex;flex-direction:column;gap:8px;flex:none}
+.top{display:flex;align-items:center;gap:10px}
+h1{margin:0;font-size:18px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+h1 small{color:var(--accent);font-weight:650}
+.sync{font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.sync.live{color:var(--ok);border-color:#2f4a38}
+.progress{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mute)}
+.bar{flex:1;height:6px;border-radius:9px;background:var(--col);overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#e8c47f);border-radius:9px;transition:width .4s}
+.filters{display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:none;border-radius:999px;padding:6px 11px;font-size:13px;cursor:pointer;white-space:nowrap;color:var(--mute)}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.youf.on{background:var(--you);border-color:var(--you);color:#241608}
+.board{flex:1;min-height:0;display:flex;gap:12px;padding:6px 14px calc(14px + env(safe-area-inset-bottom));overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding:14px}
+.col{flex:0 0 min(86vw,360px);display:flex;flex-direction:column;min-height:0;background:var(--col);border:1px solid var(--line);border-radius:14px;scroll-snap-align:start}
+@media (min-width:900px){.board{justify-content:center}.col{flex:1 1 0;max-width:420px}}
+.col h2{margin:0;padding:12px 14px 8px;font-size:13px;text-transform:uppercase;letter-spacing:.7px;color:var(--mute);display:flex;align-items:center;gap:8px}
+.col h2 .dot{width:9px;height:9px;border-radius:50%}
+.col h2 .n{margin-left:auto;background:var(--card);border-radius:999px;padding:1px 9px;font-size:12px;color:var(--ink)}
+.list{flex:1;min-height:60px;overflow-y:auto;padding:4px 10px 14px;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
+.list.over{background:rgba(193,155,87,.06);border-radius:0 0 14px 14px}
+.empty{color:var(--mute);font-size:13px;text-align:center;padding:18px 6px;border:1px dashed var(--line);border-radius:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 12px;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-x pan-y;transition:transform .12s,box-shadow .12s}
+.card:hover{background:var(--card2)}
+.card .meta{display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:650;border-radius:6px;padding:2px 7px;color:#1b1408}
+.id{font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums}
+.you{font-size:11px;font-weight:650;color:var(--you);border:1px solid rgba(226,163,90,.5);border-radius:6px;padding:1px 6px}
+.card .title{font-weight:600;line-height:1.3}
+.card .sub{font-size:12px;color:var(--mute);margin-top:5px;display:flex;gap:10px}
+.card.done .title{color:var(--mute);text-decoration:line-through;text-decoration-color:rgba(157,145,131,.5)}
+.card.ph{opacity:.25;border-style:dashed}
+.card.press{transform:scale(.97)}
+.ghost{position:fixed;z-index:50;pointer-events:none;margin:0;box-shadow:var(--shadow);transform:rotate(2.5deg) scale(1.03);cursor:grabbing;opacity:.97}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:none}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:61;max-width:560px;margin:0 auto;background:var(--col);border:1px solid var(--line);border-radius:18px 18px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));max-height:82dvh;overflow-y:auto;transform:translateY(105%);transition:transform .22s}
+.sheet.on{transform:none}.sheet-bg.on{display:block}
+.sheet h3{margin:6px 0 8px;font-size:18px}
+.sheet p{margin:6px 0;color:#e2d8c8}
+.sheet ul{margin:8px 0;padding-left:20px;color:#e2d8c8}
+.sheet li{margin:3px 0}
+.note{background:var(--card);border-left:3px solid var(--accent);padding:8px 10px;border-radius:6px;font-size:14px;margin:10px 0}
+.moves{display:flex;gap:8px;margin-top:14px}
+.moves button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:11px 8px;cursor:pointer;font-weight:600}
+.moves button.cur{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.close{float:right;border:0;background:var(--card);border-radius:50%;width:34px;height:34px;cursor:pointer;color:var(--mute)}
+.hint{font-size:12px;color:var(--mute);text-align:center;padding:0 14px 4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>Clues <small>3D</small> · Tasks</h1><span id="sync" class="sync">Saved on this device</span></div>
+  <div class="progress"><div class="bar"><i id="bar"></i></div><span id="count"></span></div>
+  <div class="filters" id="filters"></div>
+</header>
+<div class="hint" id="hint">Drag cards between columns. On a phone, press and hold a card, then drag. Tap a card for details.</div>
+<main class="board" id="board"></main>
+<div class="sheet-bg" id="sheet-bg"></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title"></section>
+
+<!-- The task list. One task per line. status: todo | doing | done. you: true when the task needs the owner's input
+     (the scheduled helper skips those). t: when the status here was last set (ms); a later move on the board wins. -->
+<script type="application/json" id="tasks-data">
+[
+{"id": "S-1", "phase": "Setup", "title": "Create the Clue3D folder in the play repo", "desc": "New game folder next to clue/, served by GitHub Pages at /play/Clue3D/.", "steps": ["Folder with index.html, css, js/, models/", "README with files and how to run"], "you": false, "status": "done", "order": 10, "t": 1794960000000},
+{"id": "S-2", "phase": "Setup", "title": "No-build three.js through an import map", "desc": "Same approach as the 2D game: no bundler. three.js 0.187 from jsDelivr.", "steps": ["Import map for three and three/addons", "Pin the version"], "you": false, "status": "done", "order": 20, "t": 1794960000000},
+{"id": "S-3", "phase": "Setup", "title": "Reuse the 2D game rules and board", "desc": "Clue3D imports ../clue/engine.js and ../clue/board.js, so both games follow the same rules.", "steps": ["Board grid, doors, passages from board.js", "Roll, move, botMove from engine.js"], "you": false, "status": "done", "order": 30, "t": 1794960000000},
+{"id": "S-4", "phase": "Setup", "title": "Trello-style task board (this page)", "desc": "Single HTML page with To do, In progress, Done. Drag and drop on phone and desktop. Saves your moves.", "steps": ["Drag with mouse; long-press then drag on touch", "Tap a card for details and Move buttons", "Sync between your devices when opened as the published page"], "you": false, "status": "done", "order": 40, "t": 1794960000000},
+{"id": "S-5", "phase": "Setup", "title": "Link Clue3D from the play README and the 2D lobby", "desc": "So friends can find the 3D version.", "steps": ["README section for Clue3D", "Small \"Try 3D\" link in the clue lobby (behind a flag until ready)"], "you": false, "status": "doing", "order": 50, "t": 1794988800000, "note": "README section added. The \"Try 3D\" link in the clue lobby waits until Clue3D has suggestions (G-6), so friends do not land in a half-made game."},
+{"id": "S-6", "phase": "Setup", "title": "Set up the scheduled helper", "desc": "A scheduled task that opens this board, picks the next To-do card that does not need you, moves it to In progress, does the work, pushes, and moves it to Done (or leaves a note).", "steps": ["You say how often (e.g. daily at night)", "Agree which tasks it may touch (only cards without \"Needs you\")", "It leaves a note on each card it worked on"], "you": true, "status": "todo", "order": 60, "t": 1794960000000},
+{"id": "A-1", "phase": "Art direction", "title": "Collect a reference board for the look", "desc": "Screenshots of Tiny Hunters and other toy-diorama games to match: chibi proportions, colours, camera angle, UI.", "steps": ["10-20 reference images (for mood only, nothing copied)", "Note what you like about each"], "you": true, "status": "todo", "order": 70, "t": 1794960000000},
+{"id": "A-2", "phase": "Art direction", "title": "Approve the palette and toon look on your phone", "desc": "Open /Clue3D/ on your phone and say what to change: colours, wall height, camera angle, brightness.", "steps": ["Check in daylight and in a dark room", "List changes as comments on this card"], "you": true, "status": "todo", "order": 80, "t": 1794960000000},
+{"id": "A-3", "phase": "Art direction", "title": "Decide the camera: fixed, or a little turning", "desc": "Today you can turn the view a little and zoom. Tiny Hunters keeps a fixed angle.", "steps": ["Fixed angle + zoom only", "or small turn allowed (current)"], "you": true, "status": "todo", "order": 90, "t": 1794960000000},
+{"id": "A-4", "phase": "Art direction", "title": "Character brief for the six suspects", "desc": "A short visual description per suspect for the 3D generator: outfit, colour, hair, prop, pose, personality.", "steps": ["Scarlett, Mustard, White, Green, Peacock, Plum", "Same chibi proportions for all", "Write the generator prompt for each"], "you": false, "status": "todo", "order": 100, "t": 1794960000000},
+{"id": "A-5", "phase": "Art direction", "title": "Weapon brief", "desc": "Chunky, oversized, readable from far away: candlestick, knife, lead pipe, revolver, rope, wrench.", "steps": ["Prompt per weapon", "Colour from the palette"], "you": false, "status": "todo", "order": 110, "t": 1794960000000},
+{"id": "A-6", "phase": "Art direction", "title": "Room diorama brief for all 9 rooms", "desc": "What furniture each room has, the floor material and the mood, so the generated rooms match.", "steps": ["Kitchen, Ballroom, Conservatory, Dining Room, Billiard Room, Library, Lounge, Hall, Study", "Front open, no walls (the game draws walls)"], "you": false, "status": "todo", "order": 120, "t": 1794960000000},
+{"id": "A-7", "phase": "Art direction", "title": "UI style guide for the 3D game", "desc": "Buttons, panels, fonts and icons that match the Clues tracker look but feel more playful.", "steps": ["Dock, cards, pop-ups, toasts", "Icon set for roll, passage, suggest, accuse"], "you": false, "status": "todo", "order": 130, "t": 1794960000000},
+{"id": "M-1", "phase": "3D models", "title": "Model loader with a manifest", "desc": "models/manifest.json lists a GLB per suspect, weapon and room. Empty slots keep the stand-ins.", "steps": ["GLTFLoader + meshopt", "Toon restyle on load", "Rooms fit the 4x4 floor, suspects fit pawn height"], "you": false, "status": "done", "order": 140, "t": 1794960000000},
+{"id": "M-2", "phase": "3D models", "title": "Model rules and Blender clean-up guide", "desc": "models/README.md: triangle budgets, origin, facing, palette, Mixamo rig, compression command.", "steps": [], "you": false, "status": "done", "order": 150, "t": 1794960000000},
+{"id": "M-3", "phase": "3D models", "title": "Generate the six suspect models", "desc": "Use the A-4 prompts in Meshy/Tripo/Rodin. T-pose, front view.", "steps": ["Generate 2-3 options each", "Pick the best, download GLB"], "you": true, "status": "todo", "order": 160, "t": 1794960000000},
+{"id": "M-4", "phase": "3D models", "title": "Generate the six weapon models", "desc": "Use the A-5 prompts.", "steps": ["Download GLB for each"], "you": true, "status": "todo", "order": 170, "t": 1794960000000},
+{"id": "M-5", "phase": "3D models", "title": "Generate the nine room dioramas", "desc": "Use the A-6 prompts. Furniture and floor only.", "steps": ["Download GLB for each"], "you": true, "status": "todo", "order": 180, "t": 1794960000000},
+{"id": "M-6", "phase": "3D models", "title": "Clean up models in Blender", "desc": "Decimate to budget, flat palette colours, apply transforms, set origin (see models/README.md).", "steps": ["Suspects 3k-8k tris", "Weapons 0.5k-2k", "Rooms 10k-25k"], "you": true, "status": "todo", "order": 190, "t": 1794960000000},
+{"id": "M-7", "phase": "3D models", "title": "Rig and animate suspects with Mixamo", "desc": "Auto-rig, then download Idle, Walk, Jump and Surprised and merge into one GLB per suspect.", "steps": ["Same animation names for all six"], "you": true, "status": "todo", "order": 200, "t": 1794960000000},
+{"id": "M-8", "phase": "3D models", "title": "Compression script for models", "desc": "One command that optimizes every GLB in models/ (meshopt + webp textures) and reports sizes.", "steps": ["tools/optimize-models script", "Size report per file"], "you": false, "status": "todo", "order": 210, "t": 1794960000000},
+{"id": "M-9", "phase": "3D models", "title": "Model checker", "desc": "Script that checks each GLB: triangle count, texture size, origin, facing, animation names, and warns.", "steps": ["Run before committing models"], "you": false, "status": "todo", "order": 220, "t": 1794960000000},
+{"id": "M-10", "phase": "3D models", "title": "Play suspect animations", "desc": "AnimationMixer per pawn: Idle while waiting, Walk while moving, Jump on hops, Surprised when called into a room.", "steps": ["Fallback to the hop tween when a model has no animations"], "you": false, "status": "todo", "order": 230, "t": 1794960000000},
+{"id": "M-11", "phase": "3D models", "title": "Weapon tokens in rooms", "desc": "Weapons start in random rooms and move when named in a suggestion, like the real game.", "steps": ["Stand-in weapon shapes first", "Swap to weapon models from the manifest"], "you": false, "status": "todo", "order": 240, "t": 1794960000000},
+{"id": "M-12", "phase": "3D models", "title": "Credits and licences for every model", "desc": "models/CREDITS.md with where each model came from and its licence.", "steps": ["Only models you made or may use"], "you": true, "status": "todo", "order": 250, "t": 1794960000000},
+{"id": "R-1", "phase": "Look & rendering", "title": "Renderer, diorama camera and controls", "desc": "High fixed angle with a narrow field of view; pinch zoom and a little turning. Fits the whole board on portrait phones.", "steps": [], "you": false, "status": "done", "order": 260, "t": 1794960000000},
+{"id": "R-2", "phase": "Look & rendering", "title": "Toon materials and one palette", "desc": "3-step toon ramp; every mesh uses palette colours from look.js.", "steps": [], "you": false, "status": "done", "order": 270, "t": 1794960000000},
+{"id": "R-3", "phase": "Look & rendering", "title": "Warm key light, cool fill, soft shadows", "desc": "Toy-on-a-table lighting.", "steps": [], "you": false, "status": "done", "order": 280, "t": 1794960000000},
+{"id": "R-4", "phase": "Look & rendering", "title": "Outlines or rim light", "desc": "A thin dark outline or a soft rim light so pawns and props pop like in Tiny Hunters.", "steps": ["Try inverted-hull outline on pawns", "Rim light in the toon shader", "Compare on phone for speed"], "you": false, "status": "todo", "order": 290, "t": 1794960000000},
+{"id": "R-5", "phase": "Look & rendering", "title": "Tilt-shift blur and light bloom", "desc": "Miniature feel: blur the top and bottom of the screen, soft bloom on gold highlights. Off on low quality.", "steps": ["EffectComposer with bokeh/tilt-shift", "Bloom only on bright things"], "you": false, "status": "todo", "order": 300, "t": 1794960000000},
+{"id": "R-6", "phase": "Look & rendering", "title": "Blob shadows and ambient occlusion", "desc": "Soft dark blobs under pawns and props so they sit on the floor even with shadows off.", "steps": ["Blob shadow texture", "Baked AO in room models"], "you": false, "status": "todo", "order": 310, "t": 1794960000000},
+{"id": "R-7", "phase": "Look & rendering", "title": "Clearer \"you can go here\" glow for rooms", "desc": "Today the room glow is faint. Make it an animated column of light with sparkles.", "steps": ["Pulsing beam shader", "Matching glow on reachable squares"], "you": false, "status": "todo", "order": 320, "t": 1794960000000},
+{"id": "R-8", "phase": "Look & rendering", "title": "Mood light when a room is in focus", "desc": "Dim the rest of the mansion and warm up the room where a suggestion happens.", "steps": [], "you": false, "status": "todo", "order": 330, "t": 1794960000000},
+{"id": "R-9", "phase": "Look & rendering", "title": "Background and table around the board", "desc": "Instead of a plain dark background: a desk with papers, a lamp and the case folder, like the Clues tracker.", "steps": [], "you": false, "status": "todo", "order": 340, "t": 1794960000000},
+{"id": "B-1", "phase": "Board & rooms", "title": "3D board from the 2D grid", "desc": "16 x 16 squares, corridors, door squares, start squares, on a table slab.", "steps": [], "you": false, "status": "done", "order": 350, "t": 1794960000000},
+{"id": "B-2", "phase": "Board & rooms", "title": "Cut-away rooms with door gaps", "desc": "Tall back wall, low side walls, a lip at the front, gaps where the doors are.", "steps": [], "you": false, "status": "done", "order": 360, "t": 1794960000000},
+{"id": "B-3", "phase": "Board & rooms", "title": "Stand-in furniture for every room", "desc": "Simple shapes so each room reads at a glance until its model arrives.", "steps": [], "you": false, "status": "done", "order": 370, "t": 1794960000000},
+{"id": "B-4", "phase": "Board & rooms", "title": "Secret passage hatches", "desc": "Gold-ringed hatches in the four corner rooms.", "steps": [], "you": false, "status": "done", "order": 380, "t": 1794960000000},
+{"id": "B-5", "phase": "Board & rooms", "title": "Room name labels", "desc": "Readable labels in front of each room.", "steps": [], "you": false, "status": "done", "order": 390, "t": 1794960000000},
+{"id": "B-6", "phase": "Board & rooms", "title": "Reachable squares and rooms after a roll", "desc": "Gold markers on squares you can reach, glow on rooms you can enter.", "steps": [], "you": false, "status": "done", "order": 400, "t": 1794960000000},
+{"id": "B-7", "phase": "Board & rooms", "title": "Put the generated room models in", "desc": "Load each room GLB in place of its stand-in furniture and tune the fit.", "steps": ["Check that pawn spots are not inside furniture"], "you": false, "status": "todo", "order": 410, "t": 1794960000000},
+{"id": "B-8", "phase": "Board & rooms", "title": "Door frames and doorway arches", "desc": "Wooden frames on every door gap so doors read clearly.", "steps": [], "you": false, "status": "todo", "order": 420, "t": 1794960000000},
+{"id": "B-9", "phase": "Board & rooms", "title": "Corridor decoration", "desc": "Rugs, plants, lamps, paintings along the corridors without blocking squares.", "steps": [], "you": false, "status": "todo", "order": 430, "t": 1794960000000},
+{"id": "B-10", "phase": "Board & rooms", "title": "Fade walls that hide pawns", "desc": "When a pawn stands behind a wall from the camera, fade that wall.", "steps": [], "you": false, "status": "todo", "order": 440, "t": 1794960000000},
+{"id": "B-11", "phase": "Board & rooms", "title": "Pawn spots inside rooms", "desc": "Up to six pawns per room standing in a nice group facing the middle, not in a grid.", "steps": [], "you": false, "status": "todo", "order": 450, "t": 1794960000000},
+{"id": "P-1", "phase": "Pawns & animation", "title": "Chibi stand-in pawns", "desc": "Big head, small body, seat colour, eyes.", "steps": [], "you": false, "status": "done", "order": 460, "t": 1794960000000},
+{"id": "P-2", "phase": "Pawns & animation", "title": "Hop along the path with squash and stretch", "desc": "Pawns hop square by square, landing with a squash.", "steps": [], "you": false, "status": "done", "order": 470, "t": 1794960000000},
+{"id": "P-3", "phase": "Pawns & animation", "title": "Turn marker", "desc": "Gold ring and bobbing arrow over whoever is playing.", "steps": [], "you": false, "status": "done", "order": 480, "t": 1794960000000},
+{"id": "P-4", "phase": "Pawns & animation", "title": "Idle breathing and looking around", "desc": "Small idle motion so the board feels alive.", "steps": [], "you": false, "status": "todo", "order": 490, "t": 1794960000000},
+{"id": "P-5", "phase": "Pawns & animation", "title": "Called-into-room effect", "desc": "A puff and a surprised jump when a suggestion pulls a suspect into the room.", "steps": ["Use gasp() in pawns.js"], "you": false, "status": "todo", "order": 500, "t": 1794960000000},
+{"id": "P-6", "phase": "Pawns & animation", "title": "Name tags over pawns", "desc": "Player name and colour over each pawn, hidden when zoomed out.", "steps": [], "you": false, "status": "todo", "order": 510, "t": 1794960000000},
+{"id": "P-7", "phase": "Pawns & animation", "title": "Different pawn shapes for colour-blind players", "desc": "Each suspect has a distinct hat or silhouette, not only a colour.", "steps": [], "you": false, "status": "todo", "order": 520, "t": 1794960000000},
+{"id": "G-1", "phase": "Gameplay", "title": "Dice that tumble and land on the rolled values", "desc": "Values come from the game; the dice only show them.", "steps": [], "you": false, "status": "done", "order": 530, "t": 1794960000000},
+{"id": "G-2", "phase": "Gameplay", "title": "Sandbox: you vs two bots on one device", "desc": "Real rules from engine.js: roll, move, enter rooms, bots take turns.", "steps": [], "you": false, "status": "done", "order": 540, "t": 1794960000000},
+{"id": "G-3", "phase": "Gameplay", "title": "Tap a glowing square or room to move", "desc": "Tap vs camera-drag told apart.", "steps": [], "you": false, "status": "done", "order": 550, "t": 1794960000000},
+{"id": "G-4", "phase": "Gameplay", "title": "Secret passage travel", "desc": "Sink into one hatch, pop out of the other.", "steps": [], "you": false, "status": "done", "order": 560, "t": 1794960000000},
+{"id": "G-5", "phase": "Gameplay", "title": "Camera zooms to the room you enter", "desc": "Then returns to the board.", "steps": [], "you": false, "status": "done", "order": 570, "t": 1794960000000},
+{"id": "G-6", "phase": "Gameplay", "title": "Make a suggestion in 3D", "desc": "In a room: pick a suspect and a weapon from a panel; the room is the one you stand in.", "steps": ["Suspect and weapon pickers with portraits", "Uses engine.suggest"], "you": false, "status": "todo", "order": 580, "t": 1794960000000},
+{"id": "G-7", "phase": "Gameplay", "title": "Move the named suspect and weapon into the room", "desc": "Animated, like the real game: the suspect pawn is pulled in, the weapon flies in.", "steps": ["Sets \"called\" for that player (engine already supports it)"], "you": false, "status": "todo", "order": 590, "t": 1794960000000},
+{"id": "G-8", "phase": "Gameplay", "title": "Answering a suggestion", "desc": "Asked players pick a card to show; only the suggester sees it. A card flips up in 3D.", "steps": ["Reuse engine.answer and pickShow"], "you": false, "status": "todo", "order": 600, "t": 1794960000000},
+{"id": "G-9", "phase": "Gameplay", "title": "Accusation and the case-closed finale", "desc": "Accuse from anywhere; the envelope opens in a pop-up with the three cards.", "steps": ["Wrong accusation: you are out but still answer"], "you": false, "status": "todo", "order": 610, "t": 1794960000000},
+{"id": "G-10", "phase": "Gameplay", "title": "Bots that suggest and accuse", "desc": "Use engine.botThink and the solver so bots play like in the 2D game.", "steps": [], "you": false, "status": "todo", "order": 620, "t": 1794960000000},
+{"id": "G-11", "phase": "Gameplay", "title": "Turn log panel", "desc": "A drawer with what happened each turn, like the 2D game.", "steps": [], "you": false, "status": "todo", "order": 630, "t": 1794960000000},
+{"id": "G-12", "phase": "Gameplay", "title": "Your notes sheet", "desc": "Reuse the 2D notes (tick and cross) in a drawer over the 3D view.", "steps": [], "you": false, "status": "todo", "order": 640, "t": 1794960000000},
+{"id": "G-13", "phase": "Gameplay", "title": "Win and lose screens", "desc": "Celebration for the winner, reveal for everyone.", "steps": [], "you": false, "status": "todo", "order": 650, "t": 1794960000000},
+{"id": "U-1", "phase": "UI", "title": "Bottom dock with the right buttons for each moment", "desc": "Roll, passage, stay, suggest, accuse, end turn; one main button at a time.", "steps": [], "you": false, "status": "todo", "order": 660, "t": 1794960000000},
+{"id": "U-2", "phase": "UI", "title": "Your cards drawer", "desc": "Your hand with the card art from clue/img.", "steps": [], "you": false, "status": "todo", "order": 670, "t": 1794960000000},
+{"id": "U-3", "phase": "UI", "title": "3D card flip for shown cards", "desc": "A card rises, flips, and drops into your notes.", "steps": [], "you": false, "status": "todo", "order": 680, "t": 1794960000000},
+{"id": "U-4", "phase": "UI", "title": "Settings: quality, sound, reduced motion", "desc": "Quality tiers (see F-2), sound on/off, fewer animations.", "steps": [], "you": false, "status": "todo", "order": 690, "t": 1794960000000},
+{"id": "U-5", "phase": "UI", "title": "First-time hints", "desc": "Short tips the first time: how to roll, move, suggest.", "steps": [], "you": false, "status": "todo", "order": 700, "t": 1794960000000},
+{"id": "U-6", "phase": "UI", "title": "Landscape and tablet layout", "desc": "Dock on the side in landscape; bigger board on tablets.", "steps": [], "you": false, "status": "todo", "order": 710, "t": 1794960000000},
+{"id": "U-7", "phase": "UI", "title": "Accessibility pass", "desc": "Labels for buttons, focus order, text alternatives for 3D events in the log.", "steps": [], "you": false, "status": "todo", "order": 720, "t": 1794960000000},
+{"id": "N-1", "phase": "Online", "title": "Decide: separate 3D game or a 3D view of the same room", "desc": "Option A: Clue3D is its own game. Option B: players in one room choose 2D or 3D view (recommended: same rules and database).", "steps": ["Your choice decides N-2 to N-6"], "you": true, "status": "todo", "order": 730, "t": 1794960000000},
+{"id": "N-2", "phase": "Online", "title": "Connect Firebase", "desc": "Reuse main.js net layer and database rules from ../clue.", "steps": [], "you": false, "status": "todo", "order": 740, "t": 1794960000000},
+{"id": "N-3", "phase": "Online", "title": "Draw the shared game state", "desc": "Pawns, dice, phase and turn come from rooms/{code}/game.", "steps": [], "you": false, "status": "todo", "order": 750, "t": 1794960000000},
+{"id": "N-4", "phase": "Online", "title": "Animate other players moves", "desc": "When positions change in the database, walk that pawn along the path instead of jumping.", "steps": ["walkPath() already exists"], "you": false, "status": "todo", "order": 760, "t": 1794960000000},
+{"id": "N-5", "phase": "Online", "title": "Host runs the bots in 3D", "desc": "Same as the 2D host: bots roll, move and answer from the host device.", "steps": [], "you": false, "status": "todo", "order": 770, "t": 1794960000000},
+{"id": "N-6", "phase": "Online", "title": "Reload and rejoin", "desc": "Anyone can reload and return through the same link.", "steps": [], "you": false, "status": "todo", "order": 780, "t": 1794960000000},
+{"id": "N-7", "phase": "Online", "title": "Multiplayer tests for the 3D client", "desc": "Extend test/app.test.js fake network to drive the 3D client logic (without WebGL).", "steps": [], "you": false, "status": "todo", "order": 790, "t": 1794960000000},
+{"id": "J-1", "phase": "Juice", "title": "Dust puffs and sparkles", "desc": "Dust when a pawn lands, sparkles when entering a room, confetti on a win.", "steps": [], "you": false, "status": "todo", "order": 800, "t": 1794960000000},
+{"id": "J-2", "phase": "Juice", "title": "Pick sound effects", "desc": "Dice, footsteps, door, gasp, card flip, win. Free sounds with licences you are happy with.", "steps": ["Listen to options and choose"], "you": true, "status": "todo", "order": 810, "t": 1794960000000},
+{"id": "J-3", "phase": "Juice", "title": "Pick background music", "desc": "A light mystery loop that fits the toy look.", "steps": [], "you": true, "status": "todo", "order": 820, "t": 1794960000000},
+{"id": "J-4", "phase": "Juice", "title": "Add sound to the game", "desc": "Play the chosen sounds; mute button; respect silent mode.", "steps": [], "you": false, "status": "todo", "order": 830, "t": 1794960000000},
+{"id": "J-5", "phase": "Juice", "title": "Phone vibration on roll and landing", "desc": "Short haptic taps (Android; iOS where allowed).", "steps": [], "you": false, "status": "todo", "order": 840, "t": 1794960000000},
+{"id": "J-6", "phase": "Juice", "title": "Camera shake and slow-motion on accusation", "desc": "Drama for the big moment.", "steps": [], "you": false, "status": "todo", "order": 850, "t": 1794960000000},
+{"id": "F-1", "phase": "Performance", "title": "FPS meter and performance budget", "desc": "Debug overlay with FPS and draw calls; target 60 fps on a mid-range phone.", "steps": [], "you": false, "status": "todo", "order": 860, "t": 1794960000000},
+{"id": "F-2", "phase": "Performance", "title": "Quality tiers", "desc": "High: shadows + post effects. Medium: shadows. Low: blob shadows, pixel ratio 1. Auto-pick by FPS.", "steps": [], "you": false, "status": "todo", "order": 870, "t": 1794960000000},
+{"id": "F-3", "phase": "Performance", "title": "Fewer draw calls", "desc": "Merge static furniture per room; instance repeated props.", "steps": [], "you": false, "status": "todo", "order": 880, "t": 1794960000000},
+{"id": "F-4", "phase": "Performance", "title": "Loading screen with progress", "desc": "Show progress while models download; start with stand-ins.", "steps": [], "you": false, "status": "todo", "order": 890, "t": 1794960000000},
+{"id": "F-5", "phase": "Performance", "title": "Self-host three.js", "desc": "Copy the three.js files into the repo so a CDN outage cannot break game night.", "steps": [], "you": false, "status": "todo", "order": 900, "t": 1794960000000},
+{"id": "F-6", "phase": "Performance", "title": "Test on your real phones", "desc": "iPhone Safari and Android Chrome: speed, touch, battery, heat.", "steps": ["Note the phone model and how it felt"], "you": true, "status": "todo", "order": 910, "t": 1794960000000},
+{"id": "Q-1", "phase": "Testing", "title": "Path tests", "desc": "test/clue3d.test.js checks walking paths against the game reach rules.", "steps": [], "you": false, "status": "done", "order": 920, "t": 1794960000000},
+{"id": "Q-2", "phase": "Testing", "title": "Screenshot check on phone and desktop sizes", "desc": "Headless browser renders the sandbox at 390x844 and 1280x800.", "steps": [], "you": false, "status": "done", "order": 930, "t": 1794960000000},
+{"id": "Q-3", "phase": "Testing", "title": "Screenshot script in the repo", "desc": "A script anyone can run to render the main screens for review.", "steps": [], "you": false, "status": "todo", "order": 940, "t": 1794960000000},
+{"id": "Q-4", "phase": "Testing", "title": "Game-night playtest with friends", "desc": "Play a full game with 3-6 people on their phones.", "steps": ["Write down every bug and confusing moment"], "you": true, "status": "todo", "order": 950, "t": 1794960000000},
+{"id": "Q-5", "phase": "Testing", "title": "Fix the playtest list", "desc": "Work through the playtest notes.", "steps": [], "you": false, "status": "todo", "order": 960, "t": 1794960000000},
+{"id": "L-1", "phase": "Launch", "title": "Check the GitHub Pages link", "desc": "Make sure /play/Clue3D/ loads from GitHub Pages on phones.", "steps": [], "you": false, "status": "todo", "order": 970, "t": 1794960000000},
+{"id": "L-2", "phase": "Launch", "title": "3D option in the clue lobby", "desc": "Host can start a 3D game (after N-1).", "steps": [], "you": false, "status": "todo", "order": 980, "t": 1794960000000},
+{"id": "L-3", "phase": "Launch", "title": "Icon, share preview and add-to-home-screen", "desc": "PWA manifest, icon and a share image.", "steps": [], "you": false, "status": "todo", "order": 990, "t": 1794960000000},
+{"id": "L-4", "phase": "Launch", "title": "Final rights check", "desc": "No Tiny Hunters or official Clue art, models, logos or names that should not be used; credits complete.", "steps": [], "you": true, "status": "todo", "order": 1000, "t": 1794960000000}
+]
+</script>
+<script>
+(function () {
+  const COLS = [
+    { id: 'todo', name: 'To do', color: '#9d9183' },
+    { id: 'doing', name: 'In progress', color: '#e2a35a' },
+    { id: 'done', name: 'Done', color: '#6fc48f' },
+  ];
+  const PHASE_COLORS = ['#c19b57', '#e7a1b4', '#9fb1dc', '#a8d89a', '#e3a989', '#c9a8d8', '#7fc6b7', '#e5cf8f', '#9fc3a8', '#f0a37a', '#b9c2d0', '#d6b4f0', '#8fd0e0'];
+  const TASKS = JSON.parse(document.getElementById('tasks-data').textContent);
+  const byId = new Map(TASKS.map((t) => [t.id, t]));
+  const phases = [...new Set(TASKS.map((t) => t.phase))];
+  const phaseColor = (p) => PHASE_COLORS[phases.indexOf(p) % PHASE_COLORS.length];
+  const LS = 'clue3d-taskboard-moves-v1';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // moves: { taskId: { col, order, t, note? } } from this device, or from the shared store when published.
+  let moves = {};
+  try { moves = JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch (e) { moves = {}; }
+  let db = null;
+  const filter = { phase: null, you: false };
+
+  // Where a task is now: the newest of the file's status and any move.
+  function place(t) {
+    const m = moves[t.id];
+    if (m && COLS.some((c) => c.id === m.col) && (m.t || 0) > (t.t || 0)) return { col: m.col, order: m.order, note: m.note || t.note };
+    return { col: t.status || 'todo', order: t.order, note: t.note };
+  }
+
+  function render() {
+    const board = $('board'), keepScroll = {};
+    board.querySelectorAll('.list').forEach((l) => { keepScroll[l.dataset.col] = l.scrollTop; });
+    const done = TASKS.filter((t) => place(t).col === 'done').length;
+    $('bar').style.width = (100 * done / TASKS.length).toFixed(1) + '%';
+    $('count').textContent = done + ' / ' + TASKS.length + ' done';
+    board.innerHTML = COLS.map((c) => {
+      const list = TASKS.filter((t) => place(t).col === c.id && (!filter.phase || t.phase === filter.phase) && (!filter.you || t.you))
+        .sort((a, b) => place(a).order - place(b).order);
+      return '<section class="col" aria-label="' + c.name + '"><h2><span class="dot" style="background:' + c.color + '"></span>' + c.name +
+        '<span class="n">' + list.length + '</span></h2><div class="list" data-col="' + c.id + '">' +
+        (list.length ? list.map(cardHtml).join('') : '<div class="empty">Drop cards here</div>') + '</div></section>';
+    }).join('');
+    board.querySelectorAll('.list').forEach((l) => { l.scrollTop = keepScroll[l.dataset.col] || 0; });
+  }
+  function cardHtml(t) {
+    const p = place(t);
+    return '<article class="card' + (p.col === 'done' ? ' done' : '') + '" data-id="' + esc(t.id) + '" tabindex="0">' +
+      '<div class="meta"><span class="tag" style="background:' + phaseColor(t.phase) + '">' + esc(t.phase) + '</span><span class="id">' + esc(t.id) + '</span>' +
+      (t.you ? '<span class="you">Needs you</span>' : '') + '</div>' +
+      '<div class="title">' + esc(t.title) + '</div>' +
+      ((t.steps && t.steps.length) || p.note ? '<div class="sub">' + (t.steps && t.steps.length ? '<span>☰ ' + t.steps.length + (t.steps.length === 1 ? ' step' : ' steps') + '</span>' : '') + (p.note ? '<span>✎ note</span>' : '') + '</div>' : '') +
+      '</article>';
+  }
+  function renderFilters() {
+    $('filters').innerHTML = '<button class="chip' + (!filter.phase ? ' on' : '') + '" data-ph="">All</button>' +
+      '<button class="chip youf' + (filter.you ? ' on' : '') + '" data-you="1">Needs you</button>' +
+      phases.map((p) => '<button class="chip' + (filter.phase === p ? ' on' : '') + '" data-ph="' + esc(p) + '">' + esc(p) + '</button>').join('');
+  }
+  $('filters').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    if (b.dataset.you) filter.you = !filter.you; else filter.phase = b.dataset.ph || null;
+    renderFilters(); render();
+  });
+
+  // ---- saving a move ----
+  async function moveTask(id, col, order) {
+    const prev = place(byId.get(id));
+    if (prev.col === col && prev.order === order) return;
+    const m = { col, order, t: Date.now(), note: (moves[id] && moves[id].note) || undefined };
+    if (m.note === undefined) delete m.note;
+    moves[id] = m;
+    try { localStorage.setItem(LS, JSON.stringify(moves)); } catch (e) {}
+    render();
+    if (db) {
+      try { await db.collection('moves').doc(id).set(m); }
+      catch (e) { setSync('Not synced: ' + (e && e.code || 'error'), false); }
+    }
+  }
+  // Order value for dropping between two cards (by their current order).
+  function orderBetween(beforeId, afterId) {
+    const a = beforeId ? place(byId.get(beforeId)).order : null, b = afterId ? place(byId.get(afterId)).order : null;
+    if (a == null && b == null) return 10;
+    if (a == null) return b - 10;
+    if (b == null) return a + 10;
+    return (a + b) / 2;
+  }
+
+  // ---- drag and drop (mouse: drag; touch: press and hold, then drag) ----
+  let drag = null, press = null;
+  const HOLD_MS = 260, SLOP = 8;
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest('.card')) e.preventDefault(); });
+  $('board').addEventListener('pointerdown', (e) => {
+    const card = e.target.closest('.card'); if (!card || e.button > 0) return;
+    press = { card, x: e.clientX, y: e.clientY, id: e.pointerId, type: e.pointerType, timer: null };
+    if (e.pointerType !== 'mouse') {
+      card.classList.add('press');
+      press.timer = setTimeout(() => { if (press) startDrag(press.x, press.y); }, HOLD_MS);
+    }
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (drag) { moveDrag(e.clientX, e.clientY); e.preventDefault(); return; }
+    if (!press) return;
+    const far = Math.hypot(e.clientX - press.x, e.clientY - press.y) > SLOP;
+    if (press.type === 'mouse') { if (far) startDrag(e.clientX, e.clientY); }
+    else if (far) cancelPress(); // finger moved before the hold: it's a scroll
+    else { press.x = e.clientX; press.y = e.clientY; }
+  }, { passive: false });
+  // Stop the page from scrolling while a card is being dragged with a finger.
+  document.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });
+  document.addEventListener('pointerup', (e) => {
+    if (drag) { endDrag(); return; }
+    cancelPress();
+  });
+  // A tap or click (not the end of a drag) opens the card. Using click avoids the tap "falling through" to the sheet's backdrop.
+  let draggedAt = 0;
+  $('board').addEventListener('click', (e) => {
+    const card = e.target.closest('.card');
+    if (card && Date.now() - draggedAt > 350) openSheet(card.dataset.id);
+  });
+  document.addEventListener('pointercancel', () => { if (drag) endDrag(); else cancelPress(); });
+  function cancelPress() { if (!press) return; clearTimeout(press.timer); press.card.classList.remove('press'); press = null; }
+
+  function startDrag(x, y) {
+    const card = press.card; clearTimeout(press.timer); card.classList.remove('press'); press = null;
+    const r = card.getBoundingClientRect();
+    const ghost = card.cloneNode(true); ghost.classList.add('ghost');
+    ghost.style.width = r.width + 'px'; ghost.style.left = r.left + 'px'; ghost.style.top = r.top + 'px';
+    document.body.appendChild(ghost);
+    card.classList.add('ph');
+    drag = { card, ghost, dx: x - r.left, dy: y - r.top, x, y, raf: 0 };
+    if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) {}
+    autoScroll();
+    moveDrag(x, y);
+  }
+  function listAt(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const col = el && el.closest('.col');
+    return col ? col.querySelector('.list') : null;
+  }
+  function moveDrag(x, y) {
+    drag.x = x; drag.y = y;
+    drag.ghost.style.left = (x - drag.dx) + 'px'; drag.ghost.style.top = (y - drag.dy) + 'px';
+    const list = listAt(x, y);
+    document.querySelectorAll('.list.over').forEach((l) => l !== list && l.classList.remove('over'));
+    if (!list) return;
+    list.classList.add('over');
+    const empty = list.querySelector('.empty'); if (empty) empty.remove();
+    const cards = [...list.querySelectorAll('.card')].filter((c) => c !== drag.card);
+    const before = cards.find((c) => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
+    if (before) { if (drag.card.nextElementSibling !== before) list.insertBefore(drag.card, before); }
+    else if (list.lastElementChild !== drag.card) list.appendChild(drag.card);
+  }
+  // Scroll the board sideways and the column up/down when dragging near an edge.
+  function autoScroll() {
+    if (!drag) return;
+    const b = $('board'), E = 56, speed = (d) => Math.ceil(10 * (1 - Math.max(0, d) / E)); // faster the closer to the edge
+    if (drag.x < E) b.scrollLeft -= speed(drag.x); else if (drag.x > innerWidth - E) b.scrollLeft += speed(innerWidth - drag.x);
+    const list = listAt(drag.x, drag.y);
+    if (list) { const r = list.getBoundingClientRect(); if (drag.y < r.top + E) list.scrollTop -= speed(drag.y - r.top); else if (drag.y > r.bottom - E) list.scrollTop += speed(r.bottom - drag.y); }
+    if (b.style.scrollSnapType !== 'none') b.style.scrollSnapType = 'none';
+    drag.raf = requestAnimationFrame(() => { moveDrag(drag.x, drag.y); autoScroll(); });
+  }
+  function endDrag() {
+    const d = drag; drag = null; cancelAnimationFrame(d.raf); draggedAt = Date.now();
+    d.ghost.remove(); d.card.classList.remove('ph');
+    $('board').style.scrollSnapType = '';
+    document.querySelectorAll('.list.over').forEach((l) => l.classList.remove('over'));
+    const list = d.card.closest('.list');
+    if (!list) { render(); return; }
+    const prev = d.card.previousElementSibling, next = d.card.nextElementSibling;
+    const id = d.card.dataset.id;
+    moveTask(id, list.dataset.col, orderBetween(prev && prev.dataset.id, next && next.dataset.id));
+  }
+
+  // ---- details sheet ----
+  function openSheet(id) {
+    const t = byId.get(id); if (!t) return;
+    const p = place(t);
+    $('sheet').innerHTML = '<button class="close" aria-label="Close">✕</button>' +
+      '<div class="meta"><span class="tag" style="background:' + phaseColor(t.phase) + '">' + esc(t.phase) + '</span> <span class="id">' + esc(t.id) + '</span>' +
+      (t.you ? ' <span class="you">Needs you</span>' : '') + '</div>' +
+      '<h3 id="sh-title">' + esc(t.title) + '</h3><p>' + esc(t.desc) + '</p>' +
+      (t.steps && t.steps.length ? '<ul>' + t.steps.map((s) => '<li>' + esc(s) + '</li>').join('') + '</ul>' : '') +
+      (p.note ? '<div class="note">' + esc(p.note) + '</div>' : '') +
+      '<div class="moves">' + COLS.map((c) => '<button data-col="' + c.id + '"' + (p.col === c.id ? ' class="cur"' : '') + '>' + c.name + '</button>').join('') + '</div>';
+    $('sheet').dataset.id = id;
+    $('sheet').classList.add('on'); $('sheet-bg').classList.add('on');
+  }
+  function closeSheet() { $('sheet').classList.remove('on'); $('sheet-bg').classList.remove('on'); }
+  $('sheet-bg').addEventListener('click', closeSheet);
+  $('sheet').addEventListener('click', (e) => {
+    if (e.target.closest('.close')) return closeSheet();
+    const b = e.target.closest('.moves button'); if (!b) return;
+    const id = $('sheet').dataset.id, col = b.dataset.col;
+    const last = TASKS.filter((t) => t.id !== id && place(t).col === col).reduce((m, t) => Math.max(m, place(t).order), 0);
+    if (place(byId.get(id)).col !== col) moveTask(id, col, last + 10);
+    closeSheet();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSheet();
+    if (e.key === 'Enter' && document.activeElement && document.activeElement.classList.contains('card')) openSheet(document.activeElement.dataset.id);
+  });
+
+  // ---- shared store (when this page is published as an artifact with a database) ----
+  function setSync(text, live) { const s = $('sync'); s.textContent = text; s.classList.toggle('live', !!live); }
+  renderFilters(); render();
+  if (window.claude && typeof window.claude.use === 'function') {
+    setSync('Connecting…');
+    const timer = setTimeout(() => setSync('Saved on this device'), 10000);
+    window.claude.use('db').then((d) => {
+      if (!d) { clearTimeout(timer); setSync('Saved on this device'); return; }
+      db = d;
+      db.collection('moves').onSnapshot((snap) => {
+        if (!snap.metadata.fromCache) { clearTimeout(timer); setSync('Synced', true); }
+        const shared = {};
+        snap.docs.forEach((doc) => { const v = doc.data(); if (v && byId.has(doc.id)) shared[doc.id] = v; });
+        // Shared moves win over this device's, unless this device moved the card later.
+        for (const [id, v] of Object.entries(shared)) if (!moves[id] || (v.t || 0) >= (moves[id].t || 0)) moves[id] = v;
+        try { localStorage.setItem(LS, JSON.stringify(moves)); } catch (e) {}
+        if (!drag) render();
+      }, (err) => { clearTimeout(timer); setSync('Saved on this device'); db = null; });
+    }).catch(() => { clearTimeout(timer); setSync('Saved on this device'); });
+  }
+})();
+</script>
+</body>
+</html>

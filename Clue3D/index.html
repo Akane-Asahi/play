@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17130f">
+<title>Clues 3D</title>
+<link rel="stylesheet" href="../clue/style.css">
+<link rel="stylesheet" href="clue3d.css">
+<!-- No build step: three.js comes from a CDN through an import map (same idea as Firebase in ../clue). -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+} }
+</script>
+</head>
+<body class="c3d">
+<header>
+  <span class="hside"><a class="ib" href="tasks.html" aria-label="Task board" title="Task board">☰</a></span>
+  <h1>Clues <span class="tname">3D</span></h1>
+  <span class="hside"><span class="pill">Sandbox</span></span>
+</header>
+<canvas id="scene" aria-label="The mansion in 3D"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<div id="toast" role="status"></div>
+<section class="dock">
+  <div class="row"><b id="turn" class="grow">Loading…</b><span id="where" class="muted"></span></div>
+  <p id="hint" class="muted"></p>
+  <div class="actions">
+    <button id="roll" class="btn" hidden>🎲 Roll the dice</button>
+    <button id="passage" class="btn ghost" hidden>Secret passage</button>
+    <button id="end" class="btn ghost" hidden>End turn</button>
+  </div>
+</section>
+<noscript><p class="warn center">Clues 3D needs JavaScript and WebGL.</p></noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

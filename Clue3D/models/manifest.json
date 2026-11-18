@@ -1,0 +1,6 @@
+{
+  "_help": "Put a file name (relative to this folder) in a slot to use that model, e.g. \"suspects/scarlett.glb\". null keeps the built-in stand-in. See README.md for the model rules.",
+  "suspects": { "Scarlett": null, "Mustard": null, "White": null, "Green": null, "Peacock": null, "Plum": null },
+  "weapons": { "Candlestick": null, "Knife": null, "Lead Pipe": null, "Revolver": null, "Rope": null, "Wrench": null },
+  "rooms": { "Kitchen": null, "Ballroom": null, "Conservatory": null, "Dining Room": null, "Billiard Room": null, "Library": null, "Lounge": null, "Hall": null, "Study": null }
+}

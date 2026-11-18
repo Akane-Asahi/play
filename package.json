@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test/engine.test.js && node test/app.test.js"
+    "test": "node test/engine.test.js && node test/app.test.js && node test/clue3d.test.js"
   },
   "devDependencies": {
     "jsdom": "^31.0.1"
