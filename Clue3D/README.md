@@ -29,3 +29,17 @@ Serve the repo root with any static server and open `/Clue3D/`.
 
 Follow `models/README.md`: clean up in Blender, export GLB, compress, put it in `models/`, name it in `models/manifest.json`.
 Empty slots keep the stand-ins, so the game works at every step.
+
+## The task board
+
+`tasks.html` is one self-contained page. The task list is the JSON block inside it (one task per line):
+`status` is `todo`, `doing` or `done`, `you: true` marks tasks that need the owner's input, and `t` is when the
+status was last set.
+
+- Opened from the repo or GitHub Pages, your drags are saved on that device (localStorage).
+- The same page is published as a private claude.ai page with a shared store:
+  https://claude.ai/artifact/UAFtXrD5Sm3VfMQaPQ89FX (slug `dbf19cf4-3dbd-4646-a84d-fc90bf2bfb72`).
+  There, every drag is written to `moves/<task id>` as `{ col, order, t, note? }`, so it syncs across devices and
+  Claude can read and move cards too.
+- A card shows the newest of its file status and its last move. When Claude finishes a task it updates both:
+  the JSON line here (and pushes) and the shared `moves/<id>` document.
