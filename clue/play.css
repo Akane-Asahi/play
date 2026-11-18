@@ -60,7 +60,7 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 @keyframes thud{0%{transform:none}20%{transform:translate(-4px,5px)}40%{transform:translate(5px,-3px)}60%{transform:translate(-3px,2px)}80%{transform:translate(2px,-1px)}100%{transform:none}}
 /* the open case file: cards are placed in percentages of the folder picture */
 .fbox{position:relative;aspect-ratio:1137/777;container-type:inline-size;background:url(img/folder.webp) center/100% 100% no-repeat;filter:drop-shadow(0 14px 18px rgba(0,0,0,.55))}
-.ftag{position:absolute;left:96.4%;top:50.5%;transform:translate(-50%,-50%) rotate(86deg);white-space:nowrap;color:#66441e;font:875 2.03cqw/1 'Bradley Hand','Segoe Print','Noteworthy','Marker Felt','Comic Sans MS',cursive;letter-spacing:.06em;text-transform:uppercase;-webkit-text-stroke:.14cqw #66441e;pointer-events:none}
+.ftag{position:absolute;left:calc(96.4% + 2px);top:50.5%;transform:translate(-50%,-50%) rotate(90deg);white-space:nowrap;color:#66441e;font:875 2.03cqw/1 'Bradley Hand','Segoe Print','Noteworthy','Marker Felt','Comic Sans MS',cursive;letter-spacing:.06em;text-transform:uppercase;-webkit-text-stroke:.14cqw #66441e;pointer-events:none}
 .epos{position:absolute}
 .epos.p0{left:38.3%;top:15.1%;width:23.4%;height:52.6%;z-index:5;--pl:-12.5%}
 .epos.p1{left:58.6%;top:24.6%;width:26.4%;height:56.4%;z-index:2;--pl:30%}
