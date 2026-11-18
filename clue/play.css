@@ -255,3 +255,11 @@ body.fullmap main{padding:0!important;max-width:none}
 .sheet .sbody{padding:14px 14px 250px}   /* room to scroll clear of the move buttons, which stay on top */
 .sheet .sx{position:absolute;top:10px;right:12px;z-index:2;width:34px;height:34px;border-radius:50%;border:0;background:rgba(0,0,0,.3);color:#f1e8da;font-size:22px;line-height:1;cursor:pointer;padding:0}
 .sheet .card.notes{margin:0 -14px -18px;border-radius:0}
+
+/* the state above a player's pill: the old text slides up and out, the new one rises in */
+.ci .cl{position:relative;overflow:hidden;min-width:100px;text-align:center}
+.ci .cl .lo,.ci .cl .ln{position:absolute;left:0;right:0;top:0}
+.ci .cl .lo{animation:lblout .45s ease-in calc(var(--t,0s) * -1) both}
+.ci .cl .ln{animation:lblin .45s ease-out calc(var(--t,0s) * -1) both}
+@keyframes lblout{from{transform:none;opacity:1}to{transform:translateY(-110%);opacity:0}}
+@keyframes lblin{from{transform:translateY(110%);opacity:0}to{transform:none;opacity:1}}

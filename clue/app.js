@@ -622,10 +622,12 @@ export function startApp({ net, doc, win, delays }) {
       const e = log[i];
       P = { key: sk + ':' + i, kind: e.t, live: false, e, i, by: e.by, cards: e.cards, list: e.t === 's' ? (e.resp || []).map((r) => r.p) : [e.by] };
     }
+    // one stage per player who is asked; the last one ends with the outcome ("Showed" / "Passed") on the same player
+    const lastR = P.live ? null : (P.e.resp || [])[P.list.length - 1];
     P.stages = P.kind === 's'
-      ? P.list.map((p, k) => ({ i: k, label: 'Showing…' })).concat([{ i: P.list.length, label: '', fin: true }])
+      ? P.list.map((p, k) => ({ i: k, label: 'Showing…' })).concat([{ i: P.list.length - 1, label: lastR && lastR.r !== 'showed' ? 'Passed' : 'Showed', fin: true }])
       : [{ i: 0, label: 'Accusing…' }, { i: 0, label: 'Wrong', fin: true }];
-    const items = P.kind === 's' ? P.list.concat([P.by]) : [P.by];
+    const items = P.kind === 's' ? P.list : [P.by];
 
     // where the replay is: it catches up with the real state one stage at a time
     const T = P.live ? P.at : P.stages.length - 1, now = Date.now();
@@ -679,9 +681,13 @@ export function startApp({ net, doc, win, delays }) {
       }
     }
 
+    // when the state of the same player changes, the old text slides up and away while the new one rises in
+    const pst = P.stages[R.prev], tt = (now - R.since) / 1000;
+    const lbl = R.prev !== R.d && pst.i === st.i && pst.label !== st.label && tt < 0.7
+      ? '<span class="lo" style="--t:' + tt.toFixed(2) + 's">' + esc(pst.label) + '</span><span class="ln" style="--t:' + tt.toFixed(2) + 's">' + esc(st.label) + '</span>' : esc(st.label);
     const W = 124, x = (k) => -(k * W + W / 2) + 'px';
     const car = '<div class="car"><div class="trk" style="--from:' + x(P.stages[R.prev].i) + ';--to:' + x(st.i) + ';--t:' + Math.min(0.8, (now - R.since) / 1000).toFixed(2) + 's">' +
-      items.map((p, k) => '<div class="ci' + (k === st.i ? ' on' : k < st.i ? ' past' : '') + '"><span class="cl">' + (k === st.i ? esc(st.label) : '') + '</span><span class="cp">' + esc(nm(p)) + '</span></div>').join('') + '</div></div>';
+      items.map((p, k) => '<div class="ci' + (k === st.i ? ' on' : k < st.i ? ' past' : '') + '"><span class="cl">' + (k === st.i ? lbl : '') + '</span><span class="cp">' + esc(nm(p)) + '</span></div>').join('') + '</div></div>';
     return head + cards + car + note + btn;
   }
   function modalHtml(D) {
