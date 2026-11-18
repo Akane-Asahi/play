@@ -350,5 +350,24 @@ async function play(db, cs, code, plan, until) {
   DL = { bot: 0, none: 0, min: 0 };
   console.log('K ok: states last a minimum, names under the cards, bots wait for Next turn');
 }
+// L: when nobody could show a card, the player can roll or make a final accusation
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const g0 = db.read('rooms/' + code + '/game');
+  const me = cs.find((c) => c.uid === g0.turn);
+  assert(me.q('[data-act=roll]') && !me.q('[data-act=accuse-open]'), 'a normal roll has no accusation button');
+  db.write('rooms/' + code + '/game', { ...g0, again: true }); db.notify(); await wait(20);
+  const b = me.q('[data-act=accuse-open]');
+  assert(b && b.textContent === 'Final Accusation' && me.q('[data-act=roll]'), 'roll and Final Accusation are both offered');
+  me.click(b); await wait(10);
+  assert(!me.q('[data-act=roll]') && me.q('[data-act=accuse-back]') && me.q('[data-act=accuse]').disabled, 'picking an accusation');
+  me.click('[data-act=sheet][data-s=notes]');
+  [0, 1, 2].forEach((k) => me.click(me.qa('tr.pk td[data-act=pick][data-k="' + k + '"]')[0]));
+  assert(!me.q('[data-act=accuse]').disabled, 'accusation is ready once suspect, weapon and room are picked');
+  me.click('[data-act=accuse-back]'); await wait(10);
+  assert(me.q('[data-act=roll]'), 'back to rolling');
+  console.log('L ok: Final Accusation when nobody could show a card');
+}
 console.log('app tests ok');
 process.exit(0);

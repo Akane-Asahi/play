@@ -359,7 +359,8 @@ export function startApp({ net, doc, win, delays }) {
   function picking() {
     const g = game;
     if (!g || g.over || g.turn !== uid) return false;
-    if (g.phase === 'answer' || g.phase === 'accusing' || g.phase === 'roll' || g.phase === 'move') return false;
+    if (g.phase === 'roll') return !!ui.accusing;                              // only when making a final accusation
+    if (g.phase === 'answer' || g.phase === 'accusing' || g.phase === 'move') return false;
     return g.phase !== 'end' || ui.accusing;
   }
   // The first cell of a notes row: the card's name, tappable while I'm choosing.
@@ -375,10 +376,11 @@ export function startApp({ net, doc, win, delays }) {
     if (!g || g.over || g.turn !== uid || g.phase === 'answer' || g.phase === 'accusing') return '';
     const ready = ui.sel.every((c) => c != null);
     let inner;
-    if (g.phase === 'roll') {
+    if (g.phase === 'roll' && !ui.accusing) {
       const to = B.PASSAGE[B.roomOf(g.pos[uid])];
       inner = '<div class="row"><button class="btn grow" data-act="roll">Roll Dice</button>' +
-        (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>';
+        (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') + '</div>' +
+        (g.again ? '<div class="row"><button class="btn danger grow" data-act="accuse-open">Final Accusation</button></div>' : '');
     } else if (g.phase === 'move') {
       const rr = g.dice ? B.reach(g.pos, uid, g.dice[0] + g.dice[1]) : null, mustLeave = g.again && rr && (rr.cells.size || Object.keys(rr.rooms).length);
       inner = '<div class="fsum">Tap a glowing square or room on the board' + (mustLeave ? ' — you have to leave the room' : '') + '</div>' + (mustLeave ? '' : '<div class="row"><button class="btn ghost grow" data-act="stay">Stay where you are</button></div>');
@@ -389,7 +391,7 @@ export function startApp({ net, doc, win, delays }) {
         '<div class="row"><button class="btn danger grow" data-act="accuse-yes">Yes, accuse</button><button class="btn ghost grow" data-act="accuse-no">Cancel</button></div>';
     } else {
       const sum = ready ? ui.sel.map((c) => esc(D.CARDS[c])).join(' · ') : (ui.sel.some((c) => c != null) ? ui.sel.map((c, k) => c != null ? esc(D.CARDS[c]) : '<i>' + S.CAT_NAMES[k].toLowerCase() + '?</i>').join(' · ') : 'Tap a suspect, a weapon and a room in your notes');
-      inner = '<div class="fsum">' + sum + '</div>' + (g.phase === 'end'
+      inner = '<div class="fsum">' + sum + '</div>' + (g.phase === 'end' || g.phase === 'roll'
         ? '<div class="row"><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button><button class="btn ghost grow" data-act="accuse-back">Back</button></div>'
         : (full() && ready && !sugReady() ? '<div class="fsum"><i>You can only suggest the ' + esc(D.CARDS[hereCard()]) + ', where you are. An accusation can name any room.</i></div>' : '') +
           '<div class="row"><button class="btn grow" data-act="suggest"' + (sugReady() ? '' : ' disabled') + '>Suggest</button><button class="btn danger grow" data-act="accuse"' + (ready ? '' : ' disabled') + '>Accuse</button></div>');
@@ -497,7 +499,8 @@ export function startApp({ net, doc, win, delays }) {
     if (g.phase === 'accusing' && g.acc) return '<div class="ask"><div class="muted">Accusation</div><div class="who">' + esc(nm(g.acc.by)) + '</div><div class="muted">is being checked…</div></div>';
     if (g.turn === me) {
       const dice = g.dice ? '<div class="dice">' + g.dice.map(dieSvg).join('') + '</div>' : '';
-      if (g.phase === 'roll' && g.again) return '<div class="ask"><div class="who">Call again</div><div class="muted">Nobody could show a card. Roll the dice and leave the room, then call again.</div></div>';
+      if (g.phase === 'roll' && ui.accusing) return '<div class="ask"><div class="who">Final accusation</div><div class="muted">Choose a suspect, a weapon and a room in your notes. If you are wrong, you are out.</div></div>';
+      if (g.phase === 'roll' && g.again) return '<div class="ask"><div class="who">Call again</div><div class="muted">Nobody could show a card. Roll the dice and leave the room to call again, or make your final accusation.</div></div>';
       if (g.phase === 'roll' && wasCalled()) return '<div class="ask"><div class="who">Your turn</div><div class="muted">You were called into the ' + esc(D.CARDS[hereCard()]) + '. Roll the dice.</div></div>';
       if (g.phase === 'roll') return '<div class="ask"><div class="who">Your turn</div><div class="muted">Roll the dice' + (B.PASSAGE[B.roomOf(g.pos[uid])] != null ? ', or take the secret passage' : '') + '</div></div>';
       if (g.phase === 'move') return '<div class="ask"><div class="who">Your turn</div>' + dice + '<div class="muted">You rolled ' + (g.dice[0] + g.dice[1]) + '. Tap where you want to go.</div></div>';

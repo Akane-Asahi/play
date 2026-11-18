@@ -71,6 +71,7 @@ const S = loadSolver();
     h = E.answer(E.answer(h, 'b', 'none'), 'c', 'none');
     assert(h.phase === 'roll' && h.again && h.turn === 'a', 'no answer: roll again');
     assert.equal(E.stayIn(h, 'a'), undefined);
+    assert(E.accuse(h, 'a', [0, 6, 12]), 'a final accusation is allowed instead of rolling');
     h = E.roll(h, 'a', [1, 1]);
     assert(h.phase === 'move' && h.again);
     assert.equal(E.move(h, 'a', 'stay'), undefined, 'must leave the room');
