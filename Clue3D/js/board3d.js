@@ -82,11 +82,12 @@ export function buildBoard(scene) {
   }
   const tileGeo = new THREE.BoxGeometry(0.94, TILE_H, 0.94);
   const colors = { a: PALETTE.corridorA, b: PALETTE.corridorB, door: PALETTE.door, start: PALETTE.start };
-  const pickables = [], m4 = new THREE.Matrix4(), slot = new Map(), bumps = [];
+  const pickables = [], m4 = new THREE.Matrix4(), slot = new Map(), bumps = [], col = new THREE.Color();
   for (const kind of Object.keys(kinds)) {
     const list = kinds[kind];
     const mesh = new THREE.InstancedMesh(tileGeo, toon(colors[kind]), list.length);
     list.forEach((i, n) => { const [x, y] = B.xy(i); const p = sq(x, y, TILE_H / 2); m4.makeTranslation(p.x, p.y, p.z); mesh.setMatrixAt(n, m4); slot.set(i, { mesh, n, x: p.x, y: p.y, z: p.z }); });
+    list.forEach((_, n) => mesh.setColorAt(n, col.setRGB(1, 1, 1)));
     mesh.receiveShadow = true;
     mesh.userData.squares = list;
     root.add(mesh); pickables.push(mesh);
@@ -142,11 +143,11 @@ export function buildBoard(scene) {
   const halos = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.52, 0.52, 0.02, 24), new THREE.MeshBasicMaterial({ color: PALETTE.neonDeep, transparent: true, opacity: 0.6, depthWrite: false }), 140);
   halos.count = 0; halos.renderOrder = 3; root.add(halos);
   const dim = new THREE.Color(PALETTE.neon), hi = new THREE.Color(PALETTE.neonHi);
-  // A Sprint sends a wave along its path: each corridor square rises and settles as the pawn passes over it.
+  // A Sprint leaves a wake along its path: each corridor square grows up like a pillar just after the pawn passes over it, then sinks back.
   // squares = board positions in path order, ms = how long the dash takes.
-  function ripple(squares, ms) {
+  function ripple(squares, ms, dur) {
     const now = performance.now(), list = squares.filter((i) => slot.has(i));
-    list.forEach((i, k) => bumps.push({ s: slot.get(i), at: now + Math.max(0, (k + 0.4) / list.length * ms - 90), dur: 520 }));
+    list.forEach((i, k) => bumps.push({ s: slot.get(i), at: now + Math.max(0, (k + 1) / list.length * ms - 40), dur: dur || 680 }));
   }
   function stepBumps() {
     if (!bumps.length) return;
@@ -154,8 +155,12 @@ export function buildBoard(scene) {
     for (let k = bumps.length - 1; k >= 0; k--) {
       const b = bumps[k], u = (now - b.at) / b.dur;
       if (u < 0) continue;
-      const done = u >= 1, off = done ? 0 : Math.sin(Math.PI * u) * 0.3 * (1 - 0.35 * u);
-      m4.makeTranslation(b.s.x, b.s.y + off, b.s.z); b.s.mesh.setMatrixAt(b.s.n, m4); touched.add(b.s.mesh);
+      const done = u >= 1, w = done ? 0 : Math.sin(Math.PI * Math.min(1, u * 1.15)), sy = 1 + 3.8 * w;
+      // the square grows up out of the board like a little pillar, a touch wider and brighter at the top, then sinks back
+      m4.makeScale(1 + 0.12 * w, sy, 1 + 0.12 * w).setPosition(b.s.x, b.s.y * sy, b.s.z);
+      b.s.mesh.setMatrixAt(b.s.n, m4);
+      col.setRGB(1 + 1.1 * w, 1 + 0.75 * w, 1 + 0.2 * w); b.s.mesh.setColorAt(b.s.n, col); b.s.mesh.instanceColor.needsUpdate = true;
+      touched.add(b.s.mesh);
       if (done) bumps.splice(k, 1);
     }
     touched.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
