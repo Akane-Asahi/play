@@ -84,7 +84,9 @@ async function walk(p, dest, kind = 'w') {
   }
   const steps = walkPath({ ...game.pos }, p, dest);
   if (kind === 's' && steps.length) {          // Sprint: a dash with a flashing light on its back, then a puff of smoke
-    await fx.dash(pawn, [pawn.position.clone(), ...steps.map((v) => standAt(v, seat[p]))], Math.max(420, Math.min(950, 260 + steps.length * 60)));
+    const dms = Math.max(420, Math.min(950, 260 + steps.length * 60));
+    board.ripple(steps, dms);
+    await fx.dash(pawn, [pawn.position.clone(), ...steps.map((v) => standAt(v, seat[p]))], dms);
     fx.smoke(standAt(dest, seat[p]));
     return;
   }

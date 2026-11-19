@@ -82,11 +82,11 @@ export function buildBoard(scene) {
   }
   const tileGeo = new THREE.BoxGeometry(0.94, TILE_H, 0.94);
   const colors = { a: PALETTE.corridorA, b: PALETTE.corridorB, door: PALETTE.door, start: PALETTE.start };
-  const pickables = [], m4 = new THREE.Matrix4();
+  const pickables = [], m4 = new THREE.Matrix4(), slot = new Map(), bumps = [];
   for (const kind of Object.keys(kinds)) {
     const list = kinds[kind];
     const mesh = new THREE.InstancedMesh(tileGeo, toon(colors[kind]), list.length);
-    list.forEach((i, n) => { const [x, y] = B.xy(i); const p = sq(x, y, TILE_H / 2); m4.makeTranslation(p.x, p.y, p.z); mesh.setMatrixAt(n, m4); });
+    list.forEach((i, n) => { const [x, y] = B.xy(i); const p = sq(x, y, TILE_H / 2); m4.makeTranslation(p.x, p.y, p.z); mesh.setMatrixAt(n, m4); slot.set(i, { mesh, n, x: p.x, y: p.y, z: p.z }); });
     mesh.receiveShadow = true;
     mesh.userData.squares = list;
     root.add(mesh); pickables.push(mesh);
@@ -142,7 +142,27 @@ export function buildBoard(scene) {
   const halos = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.52, 0.52, 0.02, 24), new THREE.MeshBasicMaterial({ color: PALETTE.neonDeep, transparent: true, opacity: 0.6, depthWrite: false }), 140);
   halos.count = 0; halos.renderOrder = 3; root.add(halos);
   const dim = new THREE.Color(PALETTE.neon), hi = new THREE.Color(PALETTE.neonHi);
+  // A Sprint sends a wave along its path: each corridor square rises and settles as the pawn passes over it.
+  // squares = board positions in path order, ms = how long the dash takes.
+  function ripple(squares, ms) {
+    const now = performance.now(), list = squares.filter((i) => slot.has(i));
+    list.forEach((i, k) => bumps.push({ s: slot.get(i), at: now + Math.max(0, (k + 0.4) / list.length * ms - 90), dur: 520 }));
+  }
+  function stepBumps() {
+    if (!bumps.length) return;
+    const now = performance.now(), touched = new Set();
+    for (let k = bumps.length - 1; k >= 0; k--) {
+      const b = bumps[k], u = (now - b.at) / b.dur;
+      if (u < 0) continue;
+      const done = u >= 1, off = done ? 0 : Math.sin(Math.PI * u) * 0.3 * (1 - 0.35 * u);
+      m4.makeTranslation(b.s.x, b.s.y + off, b.s.z); b.s.mesh.setMatrixAt(b.s.n, m4); touched.add(b.s.mesh);
+      if (done) bumps.splice(k, 1);
+    }
+    touched.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
+  }
+
   function tick(t) {                                   // called every frame: the glow breathes
+    stepBumps();
     const k = 0.5 + 0.5 * Math.sin(t / 170);
     if (marks.count) { marks.material.color.copy(dim).lerp(hi, k); halos.material.opacity = 0.5 + 0.45 * k; halos.material.color.set(PALETTE.neonDeep).lerp(dim, k * 0.6); halos.scale.setScalar(1); }
     for (const r of rooms) if (r.beam.visible) { r.beam.material.opacity = 0.2 + 0.28 * k; r.beam.userData.edges.material.color.copy(dim).lerp(hi, k); }
@@ -182,5 +202,5 @@ export function buildBoard(scene) {
   // Rooms can be named differently in other editions.
   const setRoomName = (k, text) => { if (rooms[k] && rooms[k].name !== text) { rooms[k].name = text; rooms[k].label.userData.draw(text); } };
 
-  return { root, rooms, showReach, setRoomModel, setRoomName, pick, tick };
+  return { root, rooms, showReach, setRoomModel, setRoomName, pick, tick, ripple };
 }

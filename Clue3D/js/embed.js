@@ -84,7 +84,9 @@ export function createBoardView({ doc, win, onMove }) {
     const walk = kind && kind !== 'p' ? walkPath({ ...shownMap(), [pid]: from }, pid, to) : [];
     if (walk.length && kind === 's') {
       const pts = [p.obj.position.clone(), ...walk.map((v) => standAt(v, p.seat))];
-      await fx.dash(p.obj, pts, Math.max(420, Math.min(950, 260 + walk.length * 60)));
+      const ms = Math.max(420, Math.min(950, 260 + walk.length * 60));
+      board.ripple(walk, ms);                                          // the squares it runs over rise and settle in turn
+      await fx.dash(p.obj, pts, ms);
       p.shown = to;
       fx.smoke(standAt(to, p.seat));                                  // not awaited: it fades while play carries on
       return;
