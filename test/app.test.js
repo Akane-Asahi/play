@@ -616,6 +616,21 @@ async function play(db, cs, code, plan, until) {
   assert(!host.q('.sheet'), 'a new game does not reopen the sheet');
   console.log('U ok: new game starts with the sheet closed');
 }
+// V: the Turns table says "yours" under the cards Telot holds, and only for Telot
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
+  const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands'), tel = cs[0], oth = cs[1], g = db.read(path);
+  const D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
+  const mine = hands[tel.uid][0], k = D0.catOf(mine), pick = (kk) => hands[tel.uid].find((c) => D0.catOf(c) === kk) != null ? hands[tel.uid].find((c) => D0.catOf(c) === kk) : D0.CS[kk];
+  const cards = [0, 1, 2].map((kk) => kk === k ? mine : D0.CS[kk]);
+  db.write(path, { ...g, log: [...(g.log || []), { t: 's', by: oth.uid, cards, resp: [] }] }); db.notify(); await wait(20);
+  tel.click('[data-act=sheet][data-s=turns]'); oth.click('[data-act=sheet][data-s=turns]'); await wait(20);
+  assert(tel.qa('table.tt .yrs').some((x) => /yours/i.test(x.textContent)), 'Telot sees "yours" under his own card');
+  assert(!oth.q('table.tt .yrs'), 'other players do not');
+  console.log('V ok: "yours" label in the Turns table for Telot only');
+}
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
   DL = { bot: 0, none: 0, min: 0, slide: 60 };

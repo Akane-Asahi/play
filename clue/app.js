@@ -695,7 +695,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
       if (e.t === 'd') { t += '<tr class="r"><td class="n">' + (n + 1) + '</td><td>' + tag(e.by) + '</td><td colspan="4"><div class="dd">' + E.deduceHtml(esc(nm(e.by)), e.add) + '</div></td></tr>'; continue; }
       const hn = hints(n);
       const cell = (c) => '<td>' + cardHtml(D, c) + (e.t === 's' && sh && sh.card === c ? '&nbsp;👁️' : hn.eye.has(c) ? '&nbsp;👁️' : hn.moon.has(c) ? '&nbsp;' + hn.moon.get(c) : '') +
-        (hn.qm.has(c) ? '&nbsp;<span class="qm" title="Only this player or the envelope can hold it">?</span>' : '') + '</td>';
+        (hn.qm.has(c) ? '&nbsp;<span class="qm" title="Only this player or the envelope can hold it">?</span>' : '') +
+        (isTelot() && myHand && myHand.includes(c) ? '<small class="yrs">yours</small>' : '') + '</td>';
       let ans, note = '';
       if (e.t === 'a') ans = '<span class="muted">Accused ' + (e.ok ? '✓' : '✗') + '</span>';
       else {
