@@ -990,7 +990,12 @@ export function startApp({ net, doc, win, delays, load3d }) {
     const pb = $('players-btn');
     if (pb) pb.hidden = !inGame;
     const html = h + (inGame ? playersPanel() : '');
-    if (html !== ui.lastHtml) { $('view').innerHTML = html; ui.lastHtml = html; }    // same picture: leave it alone, so nothing re-animates
+    if (html !== ui.lastHtml) {                                // same picture: leave it alone, so nothing re-animates
+      // the Notes / Turns sheet, the players panel and the wide table are redrawn from scratch: keep where they were scrolled
+      const keep = ['.sheet', '.ppanel', '.nscroll'].map((q) => { const e = doc.querySelector(q); return e ? [q, e.scrollTop, e.scrollLeft] : null; }).filter(Boolean);
+      $('view').innerHTML = html; ui.lastHtml = html;
+      keep.forEach(([q, top, left]) => { const e = doc.querySelector(q); if (e) { e.scrollTop = top; e.scrollLeft = left; } });
+    }
     sync3d();
     const mk = (ui.info ? 'i' : 'w') + msg;
     if (ui.msgKey !== mk) {                                    // only touch it when it changes, so it doesn't re-animate
