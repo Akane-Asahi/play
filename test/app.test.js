@@ -574,6 +574,35 @@ async function play(db, cs, code, plan, until) {
   assert(!/👁️|[🌕🌖🌗🌘✨]/u.test(marks(oth)) && !oth.q('.qm'), 'other players do not');
   console.log('S ok: calculator marks in the Turns table are Telot-only');
 }
+// T: the 🤡 bluff mark in the suggestion pop-up is Telot-only
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
+  const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands');
+  const tel = cs[0], oth = cs[1];
+  const g = db.read(path), A = oth.uid;
+  const D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
+  const free = (k) => { for (let c = D0.CS[k]; c < D0.CS[k] + D0.SZ[k]; c++) if (!hands[tel.uid].includes(c)) return c; };
+  const x = free(0), y = free(1), z = free(2);
+  // Telot asked; A showed him x, so Telot knows A holds x. Then A suggests x: a bluff.
+  db.write('rooms/' + code + '/shown/' + tel.uid, { 0: { card: x, to: tel.uid } });
+  db.write(path, { ...g, log: [...(g.log || []),
+    { t: 's', by: tel.uid, cards: [x, y, z], resp: [{ p: A, r: 'showed' }] },
+    { t: 's', by: A, cards: [x, y, z], resp: [{ p: tel.uid, r: 'none' }] }] }); db.notify(); await wait(30);
+  let seenTel = false, seenOth = false;
+  for (let i = 0; i < 6; i++) {
+    if (tel.q('.modal .clown')) seenTel = true;
+    if (oth.q('.modal .clown')) seenOth = true;
+    if (!tel.q('[data-act=next]') && !oth.q('[data-act=next]')) break;
+    if (tel.q('[data-act=next]')) tel.click('[data-act=next]');
+    if (oth.q('[data-act=next]')) oth.click('[data-act=next]');
+    await wait(20);
+  }
+  assert(seenTel, 'Telot sees the 🤡 on a card the suggester holds');
+  assert(!seenOth, 'others never see it');
+  console.log('T ok: bluff 🤡 for Telot only');
+}
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
   DL = { bot: 0, none: 0, min: 0, slide: 60 };

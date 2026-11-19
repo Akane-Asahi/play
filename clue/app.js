@@ -88,12 +88,13 @@ export function startApp({ net, doc, win, delays, load3d }) {
   function fan(D, cards, opts) {
     opts = opts || {};
     return '<div class="fan' + (opts.ft != null ? ' cont" style="--ft:' + opts.ft + 's' : '') + '">' + cards.map((c, i) => {
-      const tap = opts.tap && opts.tap(c), live = !(opts.dead && opts.dead(c)), src = portrait(D, c);
+      const bl = !!(opts.bluff && opts.bluff(c)), tap = opts.tap && opts.tap(c), live = !(bl || (opts.dead && opts.dead(c))), src = portrait(D, c);
       return '<div class="fc k' + i + (live ? ' live' : '') + (tap ? ' tap' : '') + (src ? ' art' : '') + '"' + (tap ? ' data-act="show" data-c="' + c + '"' : '') + '><div class="in">' +
         (src ? '<img class="pic" alt="" src="' + src + '" draggable="false">' : '') +
         '<small>' + S.CAT_NAMES[i] + '</small>' +
         (opts.seen && opts.seen(c) ? '<span class="seen" title="You showed them this card before">👁️</span>' : '') +
-        '<b' + (D.CARDS[c].length > 10 ? ' class="long"' : '') + '>' + esc(D.CARDS[c]) + '</b>' + (tap && opts.hint ? '<i>' + esc(opts.hint) + '</i>' : '') + '</div></div>';
+        '<b' + (D.CARDS[c].length > 10 ? ' class="long"' : '') + '>' + esc(D.CARDS[c]) + '</b>' + (tap && opts.hint ? '<i>' + esc(opts.hint) + '</i>' : '') +
+        (bl ? '<span class="clown" title="Bluff: the suggester holds this card">🤡</span>' : '') + '</div></div>';
     }).join('') + '</div>';
   }
 
@@ -762,7 +763,10 @@ export function startApp({ net, doc, win, delays, load3d }) {
     ui.holdWant = !P.live || R.d < T;                      // the bots wait while I'm still reading this
     const st = P.stages[R.d], cur = R.d === T;             // cur: showing the real state, not a replay of an earlier one
     const ft = Math.min(1, (now - R.first) / 1000).toFixed(2);
-    const fn = (o) => fan(D, P.cards, { ...(o || {}), ft });
+    // Telot only: a 🤡 on a card the suggester is known to hold, so they can't be hoping to find it elsewhere
+    const rr = helper(), byo = rr ? order().indexOf(P.by) : -1;
+    const bluff = rr && P.by !== uid && byo >= 0 ? (c) => rr.certain[c] === byo : null;
+    const fn = (o) => fan(D, P.cards, { bluff, ...(o || {}), ft });
     const who = st.fin ? P.by : P.list[st.i];
     let head, cards, note = '', btn = '';
 
