@@ -552,6 +552,28 @@ async function play(db, cs, code, plan, until) {
   assert.deepEqual(db.read(path).cards[t.uid], before, 'Tired is never spent');
   console.log('P ok: Stamina & Pace buttons, Deduce, Tired');
 }
+// S: Turns table marks (👁️, moons, ?) from the calculator appear for Telot only
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
+  const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands');
+  const tel = cs[0], oth = cs[1];
+  const g = db.read(path), pids = Object.keys(hands);
+  const A = pids.find((p) => p !== tel.uid), D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
+  const B = pids.find((p) => p !== tel.uid && p !== A);
+  // B says "none" to (x, y, z0), then shows a card for (x, y, z1): so B must hold z1, and Telot never saw it.
+  const free = (k, skip) => { for (let c = D0.CS[k]; c < D0.CS[k] + D0.SZ[k]; c++) if (!hands[tel.uid].includes(c) && !(skip || []).includes(c)) return c; };
+  const x = free(0), y = free(1), z0 = free(2), z1 = free(2, [z0]);
+  db.write(path, { ...g, log: [...(g.log || []),
+    { t: 's', by: A, cards: [x, y, z0], resp: [{ p: B, r: 'none' }] },
+    { t: 's', by: A, cards: [x, y, z1], resp: [{ p: B, r: 'showed' }] }] }); db.notify(); await wait(20);
+  tel.click('[data-act=sheet][data-s=turns]'); oth.click('[data-act=sheet][data-s=turns]'); await wait(20);
+  const marks = (c) => c.qa('table.tt tr.r td').map((t) => t.textContent).join(' ');
+  assert(/👁️/u.test(marks(tel)), 'Telot sees 👁️ where the calculator knows the shown card');
+  assert(!/👁️|[🌕🌖🌗🌘✨]/u.test(marks(oth)) && !oth.q('.qm'), 'other players do not');
+  console.log('S ok: calculator marks in the Turns table are Telot-only');
+}
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
   DL = { bot: 0, none: 0, min: 0, slide: 60 };

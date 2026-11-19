@@ -656,15 +656,45 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return h + '</tbody></table><p class="muted">Envelope shows the chance each card is the answer. ✓ they hold it, ✕ they can\'t, ? unknown.</p></section>';
   }
 
+  // Moon for a card that might be the shown one: how likely the showing player holds it.
+  function moonFor(p) {
+    if (p == null) return '✨';
+    const m = p >= 0.9 ? '🌕' : p > 0.5 ? '🌖' : p >= 0.45 ? '🌗' : '🌘';
+    return '<span title="Chance they hold it: ' + Math.round(p * 100) + '%">' + m + '</span>';
+  }
+
   function turnsHtml(D) {
     const log = E.logOf(game);
     if (!log.length) return '<section class="card"><h2>Turns</h2><p class="muted">No turns yet.</p></section>';
     const tag = (p) => '<span class="pn">' + esc(nm(p).slice(0, 7)) + '</span>';
+    // Telot only: what the solver can tell about the cards others showed (👁️ one card, a moon for two, ? for envelope-only)
+    const r = helper(), ord = order(), evAt = [];
+    if (r) { let k = 0; log.forEach((e, n) => { if (e.t === 's' || (e.t === 'a' && !e.ok)) evAt[k++] = n; }); }
+    const hints = (n) => {
+      const eye = new Set(), moon = new Map(), qm = new Set();
+      if (!r) return { eye, moon, qm };
+      (r.located || []).forEach((l) => {
+        if (evAt[l.ev] !== n) return;
+        if (l.cards.length === 1) eye.add(l.cards[0]);
+        else l.cards.forEach((c) => moon.set(c, moonFor(r.prob ? r.prob[c][l.p] : null)));
+      });
+      const e = log[n];
+      if (e.t === 's') e.cards.forEach((c) => {
+        if (r.certain[c] != null && r.certain[c] >= 0) return;
+        const by = ord.indexOf(e.by);
+        if (!r.possible[c][r.nP] || !r.possible[c][by]) return;
+        for (let o = 0; o < r.nP; o++) if (o !== by && r.possible[c][o]) return;
+        qm.add(c);
+      });
+      return { eye, moon, qm };
+    };
     let t = '<section class="card"><h2>Turns</h2><table class="tt"><thead><tr><th>#</th><th>By</th><th>Suspect</th><th>Weapon</th><th>Room</th><th>Showed</th></tr></thead><tbody>';
     for (let n = log.length - 1; n >= 0; n--) {
       const e = log[n], sh = myShown && myShown[n];
       if (e.t === 'd') { t += '<tr class="r"><td class="n">' + (n + 1) + '</td><td>' + tag(e.by) + '</td><td colspan="4"><div class="dd">' + E.deduceHtml(esc(nm(e.by)), e.add) + '</div></td></tr>'; continue; }
-      const cell = (c) => '<td>' + cardHtml(D, c) + (e.t === 's' && sh && sh.card === c ? '&nbsp;👁️' : '') + '</td>';
+      const hn = hints(n);
+      const cell = (c) => '<td>' + cardHtml(D, c) + (e.t === 's' && sh && sh.card === c ? '&nbsp;👁️' : hn.eye.has(c) ? '&nbsp;👁️' : hn.moon.has(c) ? '&nbsp;' + hn.moon.get(c) : '') +
+        (hn.qm.has(c) ? '&nbsp;<span class="qm" title="Only this player or the envelope can hold it">?</span>' : '') + '</td>';
       let ans, note = '';
       if (e.t === 'a') ans = '<span class="muted">Accused ' + (e.ok ? '✓' : '✗') + '</span>';
       else {
@@ -676,7 +706,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       t += '<tr class="r"><td class="n">' + (n + 1) + '</td><td>' + tag(e.by) + '</td>' + cell(e.cards[0]) + cell(e.cards[1]) + cell(e.cards[2]) + '<td>' + ans + '</td></tr>';
       if (note) t += '<tr class="nt"><td></td><td colspan="5"><div class="evsub">' + note + '</div></td></tr>';
     }
-    return t + '</tbody></table><p class="muted">👁️ marks a card you saw or showed.</p></section>';
+    return t + '</tbody></table><p class="muted">👁️ marks a card you saw or showed.' + (r ? ' The calculator also marks 👁️ when it can tell which card was shown. A moon means it is down to two cards (🌕 almost certain, 🌖 more than half, 🌗 about even, 🌘 less likely). ? means only that player or the envelope can hold the card.' : '') + '</p></section>';
   }
 
   // Entries I don't need to be told about: my own moves and cards I showed.
