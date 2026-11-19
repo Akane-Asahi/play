@@ -922,7 +922,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
         (closed ? '' : '<div class="modal"><div class="mcard finale" role="dialog" aria-modal="true"><button class="mclose" data-act="finale-close" aria-label="Close">×</button>' + finaleHtml(D) + '</div></div>');
     }
     const key = String(meta.startedAt || 0), log = E.logOf(game);
-    if (ui.seenKey !== key) { ui.seenKey = key; ui.seen = log.length; }       // only what happens from now on
+    if (ui.seenKey !== key) { ui.seenKey = key; ui.seen = log.length; ui.sheet = null; ui.sheetEnter = false; ui.sheetClosing = false; }   // only what happens from now on; a new game starts with Notes/Turns closed
     if (full() && game.turn === uid && game.phase === 'suggest') {          // the room I walked into is already chosen
       const k = log.length + ':' + game.pos[uid];
       if (ui.selKey !== k) { ui.selKey = k; ui.sel[2] = hereCard(); }

@@ -603,6 +603,19 @@ async function play(db, cs, code, plan, until) {
   assert(!seenOth, 'others never see it');
   console.log('T ok: bluff 🤡 for Telot only');
 }
+// U: a new game starts with the Notes / Turns sheet closed, even if it was open at the end of the last one
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const host = cs[0];
+  host.click('[data-act=sheet][data-s=notes]'); await wait(10);
+  assert(host.q('.sheet'), 'notes open during the game');
+  const mp = 'rooms/' + code + '/meta', g = db.read('rooms/' + code + '/game');
+  db.write(mp, { ...db.read(mp), startedAt: (db.read(mp).startedAt || 0) + 1 }); db.notify(); await wait(20);
+  assert(!host.q('.sheet'), 'a new game does not reopen the sheet');
+  console.log('U ok: new game starts with the sheet closed');
+}
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
   DL = { bot: 0, none: 0, min: 0, slide: 60 };
