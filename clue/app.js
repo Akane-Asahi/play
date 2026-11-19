@@ -359,17 +359,18 @@ export function startApp({ net, doc, win, delays, load3d }) {
     }
     return helperRes && helperRes.ok ? helperRes : null;
   }
-  // Telot only: the suspect + weapon worth asking about from the room I am in (any room in the 2D game, where
-  // the room is free to choose). Cached until the log, my cards or my room change.
-  function askBest(r) {
-    const room = full() ? hereCard() : null;
-    if (full() && room == null) return { none: true };
-    const k = helperKey + '|' + room;
-    if (askKey !== k) {
-      askKey = k; askRes = null;
-      try { const b = S.bestSuggestions(r, helperSt, 1, room == null ? undefined : room)[0]; askRes = b ? { cards: b.cards.slice(), room } : null; } catch (e) { askRes = null; }
+  // Telot only: the questions worth asking. `room` fixes the room (the one I stand in); null lets any room be named.
+  // `rank` 0 = the best, 1 = the runner-up. Cached until the log, my cards or the room change.
+  const askMemo = {};
+  function askFor(r, room, rank) {
+    const k = helperKey + '|' + room + '|' + rank;
+    if (askKey !== helperKey) { askKey = helperKey; Object.keys(askMemo).forEach((x) => delete askMemo[x]); }
+    if (!(k in askMemo)) {
+      let out = null;
+      try { const b = S.bestSuggestions(r, helperSt, rank + 1, room == null ? undefined : room)[rank]; out = b ? b.cards.slice() : null; } catch (e) { out = null; }
+      askMemo[k] = out;
     }
-    return askRes || { none: false, empty: true };
+    return askMemo[k];
   }
 
   // ---------- screens ----------
@@ -648,13 +649,22 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return h + '</tbody></table></section>';
   }
 
-  function askHtml(D, r) {
-    if (r.solved) return '<div class="muted">Best to ask</div><div class="muted">Nothing left to ask</div>';
-    const a = askBest(r);
-    if (a.none) return '<div class="muted">Best to ask</div><div class="muted">Walk into a room first</div>';
-    if (a.empty) return '<div class="muted">Best to ask</div><div class="muted">No clear choice yet</div>';
-    return '<div class="muted">' + (a.room != null ? 'Best to ask in the ' + esc(D.CARDS[a.room]) : 'Best to ask') + '</div><div class="cl">' +
-      a.cards.map((c) => '<b>' + cardHtml(D, c) + '</b>').join('') + '</div>';
+  function askCol(D, label, cards, empty) {
+    return '<div class="muted">' + label + '</div>' + (cards ? '<div class="cl">' + cards.map((c) => '<b>' + cardHtml(D, c) + '</b>').join('') + '</div>' : '<div class="muted">' + empty + '</div>');
+  }
+  // Left: the best question from the room I stand in. Right: the best question anywhere (the one that cuts the
+  // possibilities down the most). In the 2D game every room is open, so the right side shows the runner-up instead.
+  function askLeft(D, r) {
+    if (r.solved) return askCol(D, 'Best to ask', null, 'Nothing left to ask');
+    if (!full()) return askCol(D, 'Best to ask', askFor(r, null, 0), 'No clear choice yet');
+    const room = hereCard();
+    if (room == null) return askCol(D, 'Best to ask here', null, 'Walk into a room first');
+    return askCol(D, 'Best to ask in the ' + esc(D.CARDS[room]), askFor(r, room, 0), 'No clear choice yet');
+  }
+  function askRight(D, r) {
+    if (r.solved) return '<div class="muted">Envelope solved</div><div class="cl">' + r.envelope.map((l) => '<b>' + cardHtml(D, l[0].card) + '</b>').join('') + '</div>';
+    return full() ? askCol(D, 'Best to ask anywhere', askFor(r, null, 0), 'No clear choice yet')
+      : askCol(D, 'Next best to ask', askFor(r, null, 1), 'No other clear choice');
   }
 
   function notesHtml(D) {
@@ -664,10 +674,9 @@ export function startApp({ net, doc, win, delays, load3d }) {
     let located = 0;
     for (let c = 0; c < D.N; c++) if (r.certain[c] != null && r.certain[c] >= 0) located++;
     let h = '<div class="prog"><div class="tx">Located ' + located + ' out of ' + D.N + ' cards</div><div class="tr"><i style="width:' + Math.round(located / D.N * 100) + '%"></i></div></div>' +
-      '<section class="card sum3"><div class="sc ask">' + askHtml(D, r) + '</div>' +
+      '<section class="card sum3"><div class="sc ask">' + askLeft(D, r) + '</div>' +
       '<div class="sc mid" title="Candidates left: suspects · weapons · rooms">' + r.envelope.map((l) => l.length).join(' · ') + '</div>' +
-      '<div class="sc guess"><div class="muted">' + (r.solved ? 'Envelope solved' : 'Best guess for the envelope') + '</div><div class="cl">' +
-        r.envelope.map((l) => '<b>' + cardHtml(D, l[0].card) + '</b>').join('') + '</div></div></section>';
+      '<div class="sc guess">' + askRight(D, r) + '</div></section>';
     h += '<section class="card notes"><h2>Your notes</h2>';
     h += '<table class="nt"><thead><tr><th></th><th>Envelope</th>' + others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
     [0, 1, 2].forEach((k) => {

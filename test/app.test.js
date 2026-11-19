@@ -662,7 +662,7 @@ async function play(db, cs, code, plan, until) {
   assert(/^\d+ · \d+ · \d+$/.test(sec.querySelector('.mid').textContent.trim()) && !/left/i.test(sec.textContent.replace(/Best guess|Envelope solved/g, '')), 'counts only, in the middle');
   assert(/Best to ask/.test(sec.querySelector('.ask').textContent), 'ask section on the left');
   assert.equal(sec.querySelectorAll('.ask b').length, 3, 'a suspect, a weapon and a room to ask about (2D game: any room)');
-  assert(/Best guess|solved/i.test(sec.querySelector('.guess').textContent), 'best guess stays on the right');
+  assert(/Next best to ask/.test(sec.querySelector('.guess').textContent), '2D game: the runner-up question on the right');
   assert(!oth.q('.sum3'), 'others do not get it');
   // 3D/map game: the room I stand in decides
   const db2 = new FakeDb();
@@ -670,6 +670,7 @@ async function play(db, cs, code, plan, until) {
   const t2 = L.cs[0];
   t2.click('[data-act=sheet][data-s=notes]'); await wait(10);
   assert(/Walk into a room first/.test(t2.q('.sum3 .ask').textContent), 'on the street: no room to ask from yet');
+  assert(/Best to ask anywhere/.test(t2.q('.sum3 .guess').textContent) && t2.qa('.sum3 .guess b').length === 3, 'right side: the best question anywhere');
   console.log('X ok: Best to ask / counts / best guess');
 }
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
