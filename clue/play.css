@@ -323,3 +323,13 @@ html:has(.sheet),body:has(.sheet){overflow:hidden;overscroll-behavior:none}
 .qm{display:inline-block;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--accent,#d9b46a);color:var(--accent,#d9b46a);font-size:10.5px;font-weight:800;line-height:13px;text-align:center;vertical-align:1px}
 .tt .yrs{display:block;margin-top:2px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent,#c19b57)}
 .fc .pick{position:absolute;z-index:4;top:50%;left:0;right:0;text-align:center;font-size:38px;line-height:1;transform:translateY(-50%);pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
+.card.sum3{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center;margin:0 0 14px;cursor:default}
+.sum3 .sc{min-width:0}
+.sum3 .sc.guess{text-align:right}
+.sum3 .sc.guess .cl{align-items:flex-end}
+.sum3 .cl{display:flex;flex-direction:column;gap:3px;margin-top:4px;align-items:flex-start}
+.sum3 .cl b{font-size:14px}
+.sum3 .mid{font-size:20px;font-weight:700;color:var(--accent,#c19b57);text-align:center;white-space:nowrap;padding:0 2px}
+.sum3 .muted{font-size:12.5px;line-height:1.25}
+.sum3 .sc.ask{text-align:left}
+.sum3 .sc.ask .muted,.sum3 .sc.guess .muted{text-align:inherit;margin:0}

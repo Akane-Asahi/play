@@ -30,7 +30,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   let unsubs = [];
   let msg = '';
   const ui = { card: null, notes: {}, sel: [null, null, null], accusing: false, confirm: false, plOpen: false, choosing: false, selKey: null, seen: 0, seenKey: null, plExp: {}, name: lsGet(NAME_KEY) || '', code: '', edition: 'clue-us' };
-  let hostBusy = false, hostDirty = false, helperKey = null, helperRes = null, botPlan = null;
+  let hostBusy = false, hostDirty = false, helperKey = null, helperRes = null, helperSt = null, askKey = null, askRes = null, botPlan = null;
 
   // ---------- helpers ----------
   const room = (p) => 'rooms/' + roomCode + (p ? '/' + p : '');
@@ -354,9 +354,22 @@ export function startApp({ net, doc, win, delays, load3d }) {
     const key = E.logOf(game).length + '|' + JSON.stringify(myShown || {}) + '|' + myHand.join(',');
     if (key !== helperKey) {
       helperKey = key;
-      try { helperRes = S.analyse(E.solverState(edition(), players, order(), uid, myHand, game, myShown)); } catch (e) { helperRes = null; }
+      try { helperSt = E.solverState(edition(), players, order(), uid, myHand, game, myShown); helperRes = S.analyse(helperSt); } catch (e) { helperRes = null; helperSt = null; }
+      askKey = null;
     }
     return helperRes && helperRes.ok ? helperRes : null;
+  }
+  // Telot only: the suspect + weapon worth asking about from the room I am in (any room in the 2D game, where
+  // the room is free to choose). Cached until the log, my cards or my room change.
+  function askBest(r) {
+    const room = full() ? hereCard() : null;
+    if (full() && room == null) return { none: true };
+    const k = helperKey + '|' + room;
+    if (askKey !== k) {
+      askKey = k; askRes = null;
+      try { const b = S.bestSuggestions(r, helperSt, 1, room == null ? undefined : room)[0]; askRes = b ? { cards: b.cards.slice(), room } : null; } catch (e) { askRes = null; }
+    }
+    return askRes || { none: false, empty: true };
   }
 
   // ---------- screens ----------
@@ -635,6 +648,15 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return h + '</tbody></table></section>';
   }
 
+  function askHtml(D, r) {
+    if (r.solved) return '<div class="muted">Best to ask</div><div class="muted">Nothing left to ask</div>';
+    const a = askBest(r);
+    if (a.none) return '<div class="muted">Best to ask</div><div class="muted">Walk into a room first</div>';
+    if (a.empty) return '<div class="muted">Best to ask</div><div class="muted">No clear choice yet</div>';
+    return '<div class="muted">' + (a.room != null ? 'Best to ask in the ' + esc(D.CARDS[a.room]) : 'Best to ask') + '</div><div class="cl">' +
+      a.cards.map((c) => '<b>' + cardHtml(D, c) + '</b>').join('') + '</div>';
+  }
+
   function notesHtml(D) {
     const r = helper();
     if (!r) return isTelot() ? '' : manualNotesHtml(D);
@@ -642,8 +664,10 @@ export function startApp({ net, doc, win, delays, load3d }) {
     let located = 0;
     for (let c = 0; c < D.N; c++) if (r.certain[c] != null && r.certain[c] >= 0) located++;
     let h = '<div class="prog"><div class="tx">Located ' + located + ' out of ' + D.N + ' cards</div><div class="tr"><i style="width:' + Math.round(located / D.N * 100) + '%"></i></div></div>' +
-      '<section class="card sum"><div><div class="muted">' + (r.solved ? 'Envelope solved' : 'Best guess for the envelope') + '</div><b>' + r.envelope.map((l) => cardHtml(D, l[0].card)).join(' · ') + '</b></div>' +
-      '<span class="muted">' + r.envelope.map((l) => l.length).join(' · ') + ' left</span></section>';
+      '<section class="card sum3"><div class="sc ask">' + askHtml(D, r) + '</div>' +
+      '<div class="sc mid" title="Candidates left: suspects · weapons · rooms">' + r.envelope.map((l) => l.length).join(' · ') + '</div>' +
+      '<div class="sc guess"><div class="muted">' + (r.solved ? 'Envelope solved' : 'Best guess for the envelope') + '</div><div class="cl">' +
+        r.envelope.map((l) => '<b>' + cardHtml(D, l[0].card) + '</b>').join('') + '</div></div></section>';
     h += '<section class="card notes"><h2>Your notes</h2>';
     h += '<table class="nt"><thead><tr><th></th><th>Envelope</th>' + others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
     [0, 1, 2].forEach((k) => {

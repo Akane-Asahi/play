@@ -651,6 +651,27 @@ async function play(db, cs, code, plan, until) {
   }
   console.log('W ok: 🛡️ safest-card marker for Telot');
 }
+// X: Telot's summary card: best to ask (left), counts (middle, no "left"), best guess (right)
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  const db = new FakeDb();
+  const { cs } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' });
+  const tel = cs[0], oth = cs[1];
+  const sec = tel.q('.sum3');
+  assert(sec, 'summary card has three sections');
+  assert(/^\d+ · \d+ · \d+$/.test(sec.querySelector('.mid').textContent.trim()) && !/left/i.test(sec.textContent.replace(/Best guess|Envelope solved/g, '')), 'counts only, in the middle');
+  assert(/Best to ask/.test(sec.querySelector('.ask').textContent), 'ask section on the left');
+  assert.equal(sec.querySelectorAll('.ask b').length, 3, 'a suspect, a weapon and a room to ask about (2D game: any room)');
+  assert(/Best guess|solved/i.test(sec.querySelector('.guess').textContent), 'best guess stays on the right');
+  assert(!oth.q('.sum3'), 'others do not get it');
+  // 3D/map game: the room I stand in decides
+  const db2 = new FakeDb();
+  const L = await lobby(db2, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
+  const t2 = L.cs[0];
+  t2.click('[data-act=sheet][data-s=notes]'); await wait(10);
+  assert(/Walk into a room first/.test(t2.q('.sum3 .ask').textContent), 'on the street: no room to ask from yet');
+  console.log('X ok: Best to ask / counts / best guess');
+}
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
   DL = { bot: 0, none: 0, min: 0, slide: 60 };
