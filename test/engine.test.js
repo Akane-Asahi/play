@@ -159,6 +159,18 @@ const S = loadSolver();
   assert.equal(r.cells.size, 0, 'boxed in');
 }
 
+// showAdvice: show the card that helps the asker least
+{
+  const D = S.makeDeck(S.EDITIONS[0]);
+  const s0 = D.CS[0], w0 = D.CS[1], r0 = D.CS[2];
+  assert.equal(E.showAdvice(D, [], []), null, 'nothing to show');
+  assert.equal(E.showAdvice(D, [s0, w0], [w0]), w0, 'a card they already saw from me costs nothing');
+  // suspects pool is smaller than rooms/weapons once many are shown: prefer the roomier category
+  const before = [D.CS[0] + 1, D.CS[0] + 2, D.CS[0] + 3];            // three suspects already shown to them
+  assert.equal(E.showAdvice(D, [s0, r0], before), r0, 'keep them away from closing in on the suspect');
+  assert.equal(E.showAdvice(D, [s0, r0], []), D.SZ[2] > D.SZ[0] ? r0 : s0, 'with nothing shown yet, the biggest category is the safest');
+  assert.equal(E.showAdvice(D, [s0, w0], []), s0, 'equal pools: the lowest card');
+}
 // full games played by bots only
 function playGame(n, seed) {
   const ed = S.EDITIONS[seed % 2], D = S.makeDeck(ed), rng = S.mulberry32(seed);

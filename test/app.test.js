@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { webcrypto } from 'node:crypto';
 import { startApp } from '../clue/app.js';
+import * as E from '../clue/engine.js';
 import { FakeDb } from './fake-net.js';
 import { loadSolver } from './load-solver.js';
 const S = loadSolver();
@@ -630,6 +631,25 @@ async function play(db, cs, code, plan, until) {
   assert(tel.qa('table.tt .yrs').some((x) => /yours/i.test(x.textContent)), 'Telot sees "yours" under his own card');
   assert(!oth.q('table.tt .yrs'), 'other players do not');
   console.log('V ok: "yours" label in the Turns table for Telot only');
+}
+// W: when Telot has a choice of cards to show, a 🛡️ sits on the safest one; nobody else gets it
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
+  const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands'), tel = cs[0], oth = cs[1], g = db.read(path);
+  const D0 = S.makeDeck(S.EDITIONS[S.EDITIONS.findIndex((e) => e.id === db.read('rooms/' + code + '/meta/edition'))]);
+  const mine = hands[tel.uid], cats = [0, 1, 2].filter((k) => mine.some((c) => D0.catOf(c) === k));
+  if (cats.length >= 2) {
+    const cards = [0, 1, 2].map((k) => mine.find((c) => D0.catOf(c) === k) ?? D0.CS[k]);
+    const held = cards.filter((c) => mine.includes(c)), adv = E.showAdvice(D0, held, []);
+    db.write(path, { ...g, phase: 'answer', cur: { by: oth.uid, cards, order: [tel.uid], i: 0, n: (g.log || []).length, resp: [] } }); db.notify(); await wait(30);
+    const picks = tel.qa('.fc .pick');
+    assert.equal(picks.length, 1, 'one 🛡️ for Telot');
+    assert.equal(tel.qa('.fc').indexOf(picks[0].closest('.fc')), cards.indexOf(adv), 'on the card the algorithm picks');
+    assert(!cs[2].q('.fc .pick') && !oth.q('.fc .pick'), 'nobody else sees one');
+  }
+  console.log('W ok: 🛡️ safest-card marker for Telot');
 }
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {

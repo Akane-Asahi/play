@@ -369,6 +369,22 @@ export function pickShow(held, shownBefore) {
   return again != null ? again : held[0];
 }
 
+// Which of my matching cards to show so the asker learns the least. Showing a card tells the asker it is NOT in
+// the envelope, which matters most where they are closest to the answer. So: a card they have already seen from me
+// costs nothing; otherwise show the one whose category still has the most candidates for them (the deck size
+// minus the cards of that category I have already shown them). Ties go to the lowest card.
+// D needs catOf(c) and SZ[k]; held = my matching cards; before = cards I already showed this asker.
+export function showAdvice(D, held, before) {
+  if (!held || !held.length) return null;
+  const seen = before || [];
+  const again = held.find((c) => seen.includes(c));
+  if (again != null) return again;
+  const pool = (c) => { const k = D.catOf(c); return D.SZ[k] - seen.filter((x) => D.catOf(x) === k).length; };
+  let best = held[0];
+  held.forEach((c) => { if (pool(c) > pool(best)) best = c; });
+  return best;
+}
+
 // Cards `me` has already shown to `asker` (from my private shown notes).
 export function shownTo(shown, asker) {
   const out = [];

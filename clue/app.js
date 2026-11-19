@@ -94,7 +94,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
         '<small>' + S.CAT_NAMES[i] + '</small>' +
         (opts.seen && opts.seen(c) ? '<span class="seen" title="You showed them this card before">👁️</span>' : '') +
         '<b' + (D.CARDS[c].length > 10 ? ' class="long"' : '') + '>' + esc(D.CARDS[c]) + '</b>' + (tap && opts.hint ? '<i>' + esc(opts.hint) + '</i>' : '') +
-        (bl ? '<span class="clown" title="Bluff: the suggester holds this card">🤡</span>' : '') + '</div></div>';
+        (bl ? '<span class="clown" title="Bluff: the suggester holds this card">🤡</span>' : '') +
+        (opts.pick && opts.pick(c) ? '<span class="pick" title="Safest card to show">🛡️</span>' : '') + '</div></div>';
     }).join('') + '</div>';
   }
 
@@ -785,8 +786,11 @@ export function startApp({ net, doc, win, delays, load3d }) {
         const held = myHand ? P.cards.filter((c) => myHand.includes(c)) : [];
         const before = E.shownTo(myShown, P.by);
         head += (held.length ? 'Pick the card you show' : 'You have none of these') + '</div></div>';
-        cards = fn({ tap: (c) => held.includes(c), dead: (c) => !held.includes(c), seen: (c) => held.includes(c) && before.includes(c), hint: 'Tap to show' });
-        note = held.length ? '<p class="muted center">Only ' + esc(nm(P.by)) + ' sees the card you tap. 👁️ marks a card you already showed them.</p>' : '';
+        // Telot only: 🛡️ on the card that tells the asker the least (see E.showAdvice), when there is a real choice
+        const adv = isTelot() && held.length > 1 ? E.showAdvice(D, held, before) : null;
+        cards = fn({ tap: (c) => held.includes(c), dead: (c) => !held.includes(c), seen: (c) => held.includes(c) && before.includes(c), pick: (c) => adv === c, hint: 'Tap to show' });
+        note = held.length ? '<p class="muted center">Only ' + esc(nm(P.by)) + ' sees the card you tap. 👁️ marks a card you already showed them.' +
+          (adv != null ? ' 🛡️ is the safest one to show: it helps ' + esc(nm(P.by)) + ' least.' : '') + '</p>' : '';
         btn = held.length ? '' : (myHand ? '<button class="btn" data-act="pass">Pass</button>' : '');
       } else {
         head += 'if they have any of these</div></div>';
