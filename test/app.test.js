@@ -8,7 +8,7 @@ import { loadSolver } from './load-solver.js';
 const S = loadSolver();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-let DL = { bot: 0, none: 0, min: 0, slide: 0 };          // delays for every page: no waiting, unless a test says otherwise
+let DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };          // delays for every page: no waiting, unless a test says otherwise
 let L3D;                                       // fake loader for the 3D board view, set by the 3D tests
 function open(db, uid, query) {
   const dom = new JSDOM('<header><span class="hside"><button id="players-btn" data-act="players" hidden></button></span><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
@@ -363,7 +363,7 @@ async function play(db, cs, code, plan, until) {
   const g3 = db.read('rooms/' + code + '/game');
   assert(g3.phase === 'answer' || (g3.log || []).length === 2, 'then the bot plays');
   assert.equal(db.read('rooms/' + code + '/players/h2/hold'), null, 'Hana lets go of the game');
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   console.log('K ok: states last a minimum, names under the cards, bots wait for Next turn');
 }
 // L: when nobody could show a card, the player can move or make a final accusation
@@ -555,7 +555,7 @@ async function play(db, cs, code, plan, until) {
 }
 // S: Turns table marks (👁️, moons, ?) from the calculator appear for Telot only
 {
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
   const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands');
@@ -577,7 +577,7 @@ async function play(db, cs, code, plan, until) {
 }
 // T: the 🤡 bluff mark in the suggestion pop-up is Telot-only
 {
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
   const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands');
@@ -606,7 +606,7 @@ async function play(db, cs, code, plan, until) {
 }
 // U: a new game starts with the Notes / Turns sheet closed, even if it was open at the end of the last one
 {
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
   const host = cs[0];
@@ -619,7 +619,7 @@ async function play(db, cs, code, plan, until) {
 }
 // V: the Turns table says "yours" under the cards Telot holds, and only for Telot
 {
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
   const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands'), tel = cs[0], oth = cs[1], g = db.read(path);
@@ -634,7 +634,7 @@ async function play(db, cs, code, plan, until) {
 }
 // W: when Telot has a choice of cards to show, a 🛡️ sits on the safest one; nobody else gets it
 {
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' }, 'full');
   const path = 'rooms/' + code + '/game', hands = db.read('rooms/' + code + '/hands'), tel = cs[0], oth = cs[1], g = db.read(path);
@@ -653,7 +653,7 @@ async function play(db, cs, code, plan, until) {
 }
 // X: Telot's summary card: best to ask (left), counts (middle, no "left"), best guess (right)
 {
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   const db = new FakeDb();
   const { cs } = await lobby(db, ['h1', 'h2', 'h3'], [], { h1: 'Telot' });
   const tel = cs[0], oth = cs[1];
@@ -673,6 +673,24 @@ async function play(db, cs, code, plan, until) {
   assert(/Best to ask anywhere/.test(t2.q('.sum3 .guess').textContent) && t2.qa('.sum3 .guess b').length === 3, 'right side: the best question anywhere');
   console.log('X ok: Best to ask / counts / best guess');
 }
+// Z: the result of a suggestion comes as a bubble above the round buttons, then sinks away
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 150 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const path = 'rooms/' + code + '/game', g = db.read(path), A = cs[1].uid, B = cs[2].uid, watcher = cs[0];
+  const hands = db.read('rooms/' + code + '/hands'), cards = [0, 1, 2].map((k) => 0 + k);
+  db.write(path, { ...g, turn: A, phase: 'end', cur: null, log: [...(g.log || []), { t: 's', by: A, cards: [0, 7, 12], resp: [{ p: B, r: 'showed' }] }] });
+  db.notify(); await wait(30);
+  assert(!watcher.q('.hud .bubble'), 'not while the pop-up is still telling it');
+  while (watcher.q('.modal [data-act=next]')) { watcher.click('.modal [data-act=next]'); await wait(10); }
+  assert(watcher.q('.hud .bubble'), 'a bubble shows the result once the pop-up is done');
+  assert(/showed/.test(watcher.q('.hud .bubble').textContent), 'it says who showed a card');
+  assert(!watcher.q('.card.act .banner'), 'no gold rectangle in the turn card any more');
+  await wait(250);
+  assert(!watcher.q('.hud .bubble'), 'the bubble sinks away after a few seconds');
+  console.log('Z ok: result bubble above the round buttons');
+}
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
   DL = { bot: 0, none: 0, min: 0, slide: 60 };
@@ -689,7 +707,7 @@ async function play(db, cs, code, plan, until) {
   assert(me.q('.sheet.out') && me.q('.sbackdrop.out') && !me.q('.stam'), 'slides down before it goes');
   await wait(150);
   assert(!me.q('.sheet') && me.qa('.stam').length === 3, 'gone, and the movement buttons are back');
-  DL = { bot: 0, none: 0, min: 0, slide: 0 };
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
   console.log('Q ok: sheets slide, movement buttons hide');
 }
 // R: Suggest closes the notes table

@@ -12,7 +12,7 @@ const isBoardMode = (m) => m === 'full' || m === '3d';
 // load3d (optional): () => import(...) of the 3D board view. Without it, or when WebGL is missing, a 3D room shows the 2D map.
 export function startApp({ net, doc, win, delays, load3d }) {
   const S = win.ClueSolver;
-  const D0 = { bot: 3000, none: 900, min: 3000, slide: 260, ...(delays || {}) };   // min: how long each state stays on screen
+  const D0 = { bot: 3000, none: 900, min: 3000, slide: 260, bubble: 6000, ...(delays || {}) };   // min: how long each state stays on screen
   const NAME_KEY = 'clues-play-name';
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const SUS_COLORS = { scarlett: ['#c62828', '#ffffff'], mustard: ['#e1ad01', '#231a00'], white: ['#ffffff', '#222222', '#b9b4aa'],
@@ -519,18 +519,19 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return h + (hasMap() ? cancelHtml() : '') + '</aside>';
   }
 
-  function lastResultHtml(D, mine) {
-    const log = E.logOf(game), n = log.length - 1, e = log[n];
-    if (!e || e.t !== 's') return '';
+  // What the last suggestion came to, told as a bubble above the round buttons: it pops up, stays a few seconds,
+  // then sinks away (tap it to send it down early). `ui.bubOut` = the entry it is sinking for, `ui.bubGone` = done.
+  function resultBubble(D) {
+    const g = game, log = E.logOf(g), n = log.length - 1, e = log[n];
+    if (!(g.phase === 'end' && !g.nosug && g.turn !== uid) || !e || e.t !== 's' || ui.bubGone === n || ui.sheet || pendingEntry() >= 0) return '';   // not while the pop-up is still telling it
     const shower = (e.resp || []).find((r) => r.r === 'showed');
     const cards = e.cards.map((c) => D.CARDS[c]).join(', ');
-    if (!shower) return '<div class="banner"><b>Nobody had any of these.</b><br>' + esc(cards) + '</div>';
-    if (mine) {
-      const sh = myShown && myShown[n], has = sh && sh.card != null;
-      return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed you ' + (has ? esc(D.CARDS[sh.card]) : 'a card') + '.</b><br>You asked for ' + esc(cards) + '.</div>' +
-        (has ? bigCard(D, sh.card) : '');
+    if (ui.bubTimer !== n) {                         // first draw of this result: start its clock
+      ui.bubTimer = n; ui.bubOut = null;
+      win.setTimeout(() => { ui.bubOut = n; render(); win.setTimeout(() => { ui.bubGone = n; render(); }, D0.slide + 20); }, D0.bubble);
     }
-    return '<div class="banner"><b>' + esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.</b><br>' + esc(cards) + '</div>';
+    return '<div class="bubble' + (ui.bubOut === n ? ' out' : '') + '" data-act="bubble" role="status"><b>' +
+      (shower ? esc(nm(shower.p)) + ' showed ' + esc(nm(e.by)) + ' a card.' : 'Nobody had any of these.') + '</b><span>' + esc(cards) + '</span></div>';
   }
 
   // The words on a card's label plate in the finale: "Mr. PLUM", "HALL", "REVOLVER".
@@ -603,7 +604,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       if (g.phase === 'end' && !ui.accusing) return '<div class="ask"><div class="who">Your turn</div><div class="muted">End your turn, or make an accusation</div></div>';
       return '<div class="ask"><div class="who">Your turn</div><div class="muted">' + (g.phase === 'end' ? 'Make your accusation' : 'Make a suggestion, or accuse if you are sure') + '</div></div>';
     }
-    let h = g.phase === 'end' && !g.nosug ? lastResultHtml(D, false) : '';
+    let h = '';
     const hereK = full() ? B.roomOf(g.pos[g.turn]) : -1;
     h += '<div class="ask"><div class="muted">' + (g.phase === 'end' ? 'Waiting for' : 'Turn') + '</div><div class="who">' + esc(nmFull(g.turn)) + '</div>' +
       '<div class="muted">' +
@@ -929,7 +930,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   }
   function hudHtml(D) {
     const notes = notesHtml(D) ? '<button class="fab' + (ui.sheet === 'notes' ? ' on' : '') + '" data-act="sheet" data-s="notes" aria-label="Your notes">' + ICON_NOTES + '</button>' : '';
-    return '<div class="hud"><div class="hrow"><div class="fabs">' + stamHtml() + '<button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div></div>' + floatHtml(D) + '</div>';
+    return '<div class="hud">' + resultBubble(D) + '<div class="hrow"><div class="fabs">' + stamHtml() + '<button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div></div>' + floatHtml(D) + '</div>';
   }
   function sheetHtml(D) {
     if (!ui.sheet) return '';
@@ -1064,6 +1065,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       case 'finale-close': ui.finaleClosed = (meta.startedAt || 0) + ':' + game.over.winner; render(); break;
       case 'finale-open': ui.finaleClosed = null; render(); break;
       case 'players': ui.plOpen = !ui.plOpen; render(); break;
+      case 'bubble': { const n = E.logOf(game).length - 1; if (ui.bubOut !== n) { ui.bubOut = n; render(); win.setTimeout(() => { ui.bubGone = n; render(); }, D0.slide + 20); } break; }
       case 'sheet': {
         const want = el.dataset.s && ui.sheet !== el.dataset.s ? el.dataset.s : null;
         if (ui.sheetClosing) break;

@@ -333,3 +333,13 @@ html:has(.sheet),body:has(.sheet){overflow:hidden;overscroll-behavior:none}
 .sum3 .muted{font-size:12.5px;line-height:1.25}
 .sum3 .sc.ask{text-align:left}
 .sum3 .sc.ask .muted,.sum3 .sc.guess .muted{text-align:inherit;margin:0}
+
+/* result bubble: pops up above the round buttons, then sinks away */
+.bubble{align-self:flex-end;position:relative;margin:0 14px 16px;max-width:min(80%,300px);padding:11px 15px;border-radius:20px 20px 6px 20px;background:var(--accent);color:var(--accent-ink);box-shadow:0 10px 28px rgba(0,0,0,.5);cursor:pointer;transform-origin:100% 100%;animation:bubIn .42s cubic-bezier(.2,1.35,.4,1) both}
+.bubble b{display:block;font-size:15.5px;line-height:1.25}
+.bubble span{display:block;margin-top:2px;font-size:13.5px;opacity:.85}
+.bubble::after{content:'';position:absolute;right:19px;bottom:-6px;width:14px;height:14px;background:inherit;border-radius:0 0 4px 0;transform:rotate(45deg)}
+.bubble.out{animation:bubOut .26s ease-in both}
+@keyframes bubIn{from{opacity:0;transform:translateY(22px) scale(.82)}to{opacity:1;transform:none}}
+@keyframes bubOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(46px) scale(.9)}}
+@media (prefers-reduced-motion:reduce){.bubble,.bubble.out{animation-duration:.01s}}
