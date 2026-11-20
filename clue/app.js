@@ -519,7 +519,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return h + (hasMap() ? cancelHtml() : '') + '</aside>';
   }
 
-  // What the last suggestion came to, told as a bubble above the round buttons: it pops up, stays a few seconds,
+  // What the last suggestion came to, told as a bubble above the Final Accusation button: it pops up, stays a few seconds,
   // then sinks away (tap it to send it down early). `ui.bubOut` = the entry it is sinking for, `ui.bubGone` = done.
   function resultBubble(D) {
     const g = game, log = E.logOf(g), n = log.length - 1, e = log[n];
@@ -930,7 +930,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   }
   function hudHtml(D) {
     const notes = notesHtml(D) ? '<button class="fab' + (ui.sheet === 'notes' ? ' on' : '') + '" data-act="sheet" data-s="notes" aria-label="Your notes">' + ICON_NOTES + '</button>' : '';
-    return '<div class="hud">' + resultBubble(D) + '<div class="hrow"><div class="fabs">' + stamHtml() + '<button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div></div>' + floatHtml(D) + '</div>';
+    return '<div class="hud"><div class="hrow"><div class="fabs">' + stamHtml() + '<button class="fab' + (ui.sheet === 'turns' ? ' on' : '') + '" data-act="sheet" data-s="turns" aria-label="Turns">' + ICON_TURNS + '</button>' + notes + '</div></div>' + resultBubble(D) + floatHtml(D) + '</div>';
   }
   function sheetHtml(D) {
     if (!ui.sheet) return '';

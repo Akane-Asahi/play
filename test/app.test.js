@@ -673,7 +673,7 @@ async function play(db, cs, code, plan, until) {
   assert(/Best to ask anywhere/.test(t2.q('.sum3 .guess').textContent) && t2.qa('.sum3 .guess b').length === 3, 'right side: the best question anywhere');
   console.log('X ok: Best to ask / counts / best guess');
 }
-// Z: the result of a suggestion comes as a bubble above the round buttons, then sinks away
+// Z: the result of a suggestion comes as a bubble above the Final Accusation panel, then sinks away
 {
   DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 150 };
   const db = new FakeDb();
@@ -689,7 +689,7 @@ async function play(db, cs, code, plan, until) {
   assert(!watcher.q('.card.act .banner'), 'no gold rectangle in the turn card any more');
   await wait(250);
   assert(!watcher.q('.hud .bubble'), 'the bubble sinks away after a few seconds');
-  console.log('Z ok: result bubble above the round buttons');
+  console.log('Z ok: result bubble above the Final Accusation panel');
 }
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
