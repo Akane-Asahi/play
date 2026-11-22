@@ -384,3 +384,8 @@ body.home main{padding:0;max-width:none}
 
 /* Back to the first page (lobby) sits at the far left of the nav bar */
 #back-btn{margin-right:auto;margin-left:-4px;color:var(--ink)}
+
+/* Real-table tracker (table/): a fourth card under "What kind of game?" and a quiet link under the dock */
+a.mode{text-decoration:none}
+.homedock .tablelink{display:block;margin:14px 0 0;text-align:center;color:#cdbfa8;font-size:14px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(241,232,218,.35)}
+.homestage.open .homedock .tablelink{display:none}

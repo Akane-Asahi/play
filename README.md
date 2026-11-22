@@ -57,6 +57,7 @@ npm test
 - `clue/firebase-config.js`: the web config
 - `clue/solver.js`: the deduction engine, copied from the Clues repo
 - `clue/portraits.js`, `clue/img/`: card art
+- `clue/table/index.html`: the real-table tracker (bookkeeping only, works offline after load)
 - `database.rules.json`: the Realtime Database rules (repo root)
 
 ## Fast game and full game
@@ -71,6 +72,14 @@ When you create a room you pick the kind of game (the host can still switch it i
   **Deduce** refills (+1 Sprint, +2 Jog, +2 Walk) but costs the whole turn, and is locked until one kind has run out.
   Pawns in corridors block the way. Bots spend cards and Deduce according to a personality (`PERSONAS` in `clue/engine.js`).
 - **3D game** – the full game with the mansion in 3D (see below).
+
+## Real table (bookkeeping only)
+
+Playing Clue with a real board and real cards? Open `/clue/table/` (the link under Join room on the first page, or
+**Real table** under "What kind of game?"). It is the Clues tracker from the Akane-Asahi/clue repo: no room, no
+Firebase, nothing shared. One phone logs every suggestion, who said none, who showed and who refused, and works out
+what can still be in the envelope. The game is saved on that device under its own keys (`clues-table-*`), so it never
+mixes with the standalone tracker's saved game. It reuses `clue/solver.js` and `clue/portraits.js`.
 
 ## Clues 3D (in progress)
 

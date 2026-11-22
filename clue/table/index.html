@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clues – envelope deduction tracker</title>
+<style>
+:root{
+  --bg:#14100d; --card:#211b16; --ink:#f1e8da; --mute:#9d9183; --line:#34291f;
+  --accent:#c19b57; --accent-ink:#1b1408; --ok:#6fc48f; --warn:#e2a35a; --bad:#f07a72;
+  --mine:#1d2a22; --heat:193,155,87; --red:#e0766d; --shadow:0 10px 40px rgba(0,0,0,.6);
+  --cream:#f1e8da; --cink:#2a1f14; --cmute:#8d7a58; --cred:#8a2f25; --csel:#e3d5b3; --cline:#ddd0b6;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:10px 12px}
+header h1{flex:1;text-align:center;margin:0;font-size:17px;font-weight:650;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header h1 .tdot{color:var(--mute);margin:0 2px}
+header h1 .tname{color:var(--accent)}
+.ib{width:40px;height:40px;border-radius:50%;border:0;background:var(--card);color:var(--accent);cursor:pointer;font-size:18px;line-height:1}
+header .ib:last-child{color:var(--ink)}
+header h1 .tname{cursor:pointer;border-bottom:1px dotted currentColor}
+main{padding:12px 14px 110px;max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px}
+h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute);font-weight:600}
+h3{margin:0 0 6px;font-size:16px}
+p{margin:6px 0}
+.muted{color:var(--mute);font-size:13px}
+.warn{color:var(--warn);font-size:13px;margin:6px 0}
+.err{color:var(--bad);font-size:13px;margin:6px 0}
+input[type=text],select,textarea{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+textarea{min-height:90px;resize:vertical}
+label.l{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+.btn{display:block;width:100%;border:0;border-radius:10px;padding:12px 14px;background:var(--accent);color:var(--accent-ink);font-weight:650;cursor:pointer;margin-top:10px;text-align:center}
+.btn.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
+.btn.danger{background:none;color:var(--bad);border:1px solid var(--line)}
+.btn[disabled]{opacity:.4;cursor:default}
+.row{display:flex;gap:8px;align-items:center}
+.row>.grow{flex:1}
+.pills{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.pills::-webkit-scrollbar{display:none}
+.pill{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.pill.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pill.done{color:var(--mute)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg);font-size:13px;cursor:pointer}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip.off{opacity:.35;pointer-events:none}
+.prow{display:grid;grid-template-columns:26px minmax(0,1fr) auto 40px;gap:8px;align-items:center;margin-bottom:6px}
+.prow .tag{justify-self:center}
+.prow{position:relative;transition:transform .15s;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.prow input{-webkit-user-select:text;user-select:text}
+body.dragging-now{-webkit-user-select:none;user-select:none}
+body.dragging-now .prow input{-webkit-user-select:none;user-select:none;pointer-events:none}
+.prow.dragging{transition:none;z-index:5;background:var(--card);box-shadow:var(--shadow);border-radius:10px}
+.num{-webkit-user-select:none;user-select:none}
+.num[data-drag]{width:30px;height:30px;margin:-2px;font-weight:700}
+.num{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--accent)}
+.tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;background:var(--ink);color:var(--bg)}
+.sm{border:1px solid var(--line);background:var(--card);border-radius:8px;width:30px;height:30px;cursor:pointer}
+.switch{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.switch:first-of-type{border-top:0}
+.tog{flex:none;width:46px;height:28px;border-radius:999px;background:var(--line);border:0;position:relative;cursor:pointer}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--card);transition:left .15s}
+.tog.on{background:var(--accent)} .tog.on::after{left:21px}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper b{min-width:18px;text-align:center}
+/* game list */
+main.gm{padding:6px 0 0}
+.gm .card{margin:0 14px 12px}
+.prog{padding:4px 18px 10px}
+.prog .tx{font-size:14px;color:var(--ink);margin-bottom:8px}
+.prog .tr{height:6px;border-radius:3px;background:#3a3129;overflow:hidden}
+.prog .tr i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+.sum{display:flex;gap:8px;align-items:center;justify-content:space-between;cursor:pointer;margin:0 14px 14px}
+.sum b{font-size:13px}
+.paper{background:var(--cream);color:var(--cink);border-radius:28px 28px 0 0;padding:4px 0 300px;min-height:60vh}
+.cathead{display:grid;gap:2px;align-items:end;padding:18px 18px 6px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--cmute);font-weight:700}
+.cathead span.i{color:var(--cink);letter-spacing:0;font-size:13px}
+.cathead span.i{text-align:center}
+.crow{position:relative;display:grid;gap:2px;align-items:center;padding:9px 18px;border-bottom:1px solid var(--cline);cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.crow.sel{background:var(--csel)}
+.holding::after{content:'';position:absolute;left:0;bottom:0;height:3px;background:var(--accent);animation:holdbar 2.7s linear forwards;pointer-events:none}
+@keyframes holdbar{from{width:0}to{width:100%}}
+.crow .pc{font-size:14px;font-weight:650;color:var(--cred);font-variant-numeric:tabular-nums}
+.bar{height:4px;border-radius:2px;background:var(--cline);overflow:hidden;margin-top:3px;width:34px}
+.bar i{display:block;height:100%;background:var(--cred)}
+.crow .nm{font-size:16px;color:var(--cink)}
+.crow .sub{font-size:12px;color:var(--cmute)}
+.crow.elim .nm{text-decoration:line-through;color:var(--cmute)}
+.crow.mine .nm{text-decoration:line-through;color:var(--cmute)}
+.crow .tagw{grid-column:3/-1;text-align:center;font-size:11px;letter-spacing:2px;font-weight:700;color:var(--cmute);white-space:nowrap}
+.crow.solved .nm{font-weight:700}
+.crow.solved .pc{color:#2d7a4f}
+.c{text-align:center;font-size:15px}
+.c.pp{font-size:12.5px;color:var(--cmute);opacity:.75;font-weight:500;letter-spacing:-.2px}
+.c.pp.hi{color:var(--cred);opacity:1;font-weight:800}
+.c.y{color:#2d7a4f;font-weight:800}
+.c.n{color:var(--cmute);opacity:.45}
+.c.q{color:var(--cred);font-weight:800}
+.bottom{flex-wrap:wrap;position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--bg);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;max-width:720px;margin:0 auto}
+.bottom .btn{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.btn.dim{opacity:.55}
+.fc .clown{display:block;font-size:20px;line-height:1;margin-top:6px}
+.fc .seen{position:absolute;left:0;right:0;bottom:21%;z-index:4;text-align:center;font-size:20px;line-height:1;pointer-events:none}
+.dock{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));z-index:6;width:calc(100% - 24px);max-width:696px;margin:0 auto;background:#262019;border-radius:28px;padding:16px 16px 16px;box-shadow:0 12px 40px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04)}
+.dock .hint{font-size:13px;line-height:1.35;color:#c9bfae;text-align:center;margin:0 6px 10px}
+.dock .best{border:1px solid #5a4a2c;border-radius:18px;padding:8px 10px 10px;margin:0 0 10px;text-align:center;cursor:pointer;background:rgba(193,155,87,.08)}
+.dock .best .bl{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px}
+.dock .best .bl em{font-style:normal;letter-spacing:.2px;text-transform:none;color:#a99c86;font-weight:500}
+.dock .best .inroom{margin-top:7px;color:#a99c86;font-size:12px}
+.dock .best .bp{display:flex;justify-content:center;gap:6px}
+.dock .best .bp span{border:1px solid var(--accent);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dock .best .bp span.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.dock .best .bp span:active{filter:brightness(1.25)}
+.dock .sp{display:flex;justify-content:center;gap:6px;flex-wrap:nowrap;margin:0 0 12px}
+.dock .sp span{background:var(--cream);color:var(--cink);border-radius:999px;padding:6px 11px;font-size:13px;font-weight:600;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dock .btn{margin:0;border-radius:999px;padding:16px 14px;font-size:17px;font-weight:700}
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:720px;max-height:92vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.sheet-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.sheet-head h3{flex:1;text-align:center;margin:0}
+.sheet-body{overflow:auto;padding:12px 14px calc(18px + env(safe-area-inset-bottom))}
+.modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px}
+.dlg{background:var(--card);border-radius:18px;padding:20px;width:100%;max-width:360px;box-shadow:var(--shadow);text-align:center}
+.dlg h3{font-size:19px}
+.bigcard{margin:14px auto;border:2px solid var(--accent);border-radius:14px;width:150px;padding:34px 10px;font-weight:750;font-size:20px;background:var(--bg)}
+.bigcard.art{position:relative;width:176px;aspect-ratio:.62;padding:0;overflow:hidden;background:#000;border:0;border-radius:18px;box-shadow:0 0 0 2px var(--accent),0 16px 30px -6px rgba(0,0,0,.6)}
+.bigcard.art small{position:absolute;display:block;margin:0;font-size:10.5px;letter-spacing:2.4px;font-weight:800;color:#e3d5b3}
+.bigcard.art b{font-size:21px;font-weight:800;padding:38px 8px 16px}
+.bigrow{display:flex;flex-wrap:wrap;justify-content:center;gap:0 10px}
+.bigrow.multi .bigcard.art{width:128px}
+.bigrow.multi .bigcard.art b{font-size:16px;padding:28px 4px 12px}
+.bigrow.multi .bigcard.art small{font-size:9px;letter-spacing:1.8px}
+.bigcard small{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.tiles{display:flex;gap:8px;justify-content:center;margin:14px 0}
+.tile{flex:1;border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:22px 6px;text-align:center;font-weight:700;cursor:pointer}
+.tile small{display:block;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.tile.sel{border-color:var(--accent);background:var(--bg)}
+.ask{text-align:center;margin:10px 0 0}
+.fan{position:relative;height:282px;max-width:380px;margin:6px auto 0}
+.fc{position:absolute;top:22px;width:37%;aspect-ratio:.62;border-radius:16px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px solid var(--line);background:var(--card);color:var(--mute);z-index:1;transform-origin:50% 90%}
+.fc.k0{left:31.5%;z-index:4;top:12px}
+.fc.k1{left:62%;z-index:2;transform:rotate(8deg) translateY(8px);animation:fanR .6s cubic-bezier(.22,1.15,.36,1) .05s both}
+.fc.k2{left:1.5%;z-index:3;transform:rotate(-8deg) translateY(8px);animation:fanL .6s cubic-bezier(.22,1.15,.36,1) .05s both}
+.fc .in{position:absolute;top:0;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.fc.k0{animation:fanC .5s cubic-bezier(.22,1.2,.36,1) both}
+@keyframes fanL{from{transform:translateX(72%) rotate(0) translateY(12px) scale(.96)}to{transform:rotate(-8deg) translateY(8px)}}
+@keyframes fanR{from{transform:translateX(-72%) rotate(0) translateY(12px) scale(.96)}to{transform:rotate(8deg) translateY(8px)}}
+@keyframes fanC{from{transform:translateY(26px) scale(.95)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){.fc{animation:none!important}}
+.fc small{position:absolute;top:11%;left:0;right:0;text-align:center;font-size:10.5px;letter-spacing:2.4px;font-weight:800;text-transform:uppercase}
+.fc b{font-size:17.5px;font-weight:800;line-height:1.15;padding:0;max-width:62%;letter-spacing:-.2px;text-align:center;hyphens:manual;-webkit-hyphens:manual;overflow-wrap:normal;word-break:normal}
+.fc i{position:absolute;bottom:10%;left:0;right:0;text-align:center;font-size:10.5px;white-space:nowrap;font-style:italic;font-weight:500}
+.fc.live{background:radial-gradient(ellipse 75% 55% at 50% 52%,rgba(130,105,70,.16),transparent 72%),linear-gradient(168deg,#f4eee2,#e8dfce);color:#241b0d;border-color:#e2d6bc;box-shadow:0 18px 32px -4px rgba(0,0,0,.55),0 4px 10px rgba(0,0,0,.35)}
+.fc.live.k0{box-shadow:0 22px 38px -4px rgba(0,0,0,.6),0 0 30px 6px rgba(0,0,0,.42),0 4px 10px rgba(0,0,0,.35)}
+.fc:not(.live){box-shadow:0 10px 22px -6px rgba(0,0,0,.5)}
+.fc.k0:not(.live){box-shadow:0 14px 28px -4px rgba(0,0,0,.55),0 0 26px 4px rgba(0,0,0,.35)}
+.fc.live::before{content:'';position:absolute;inset:7px;border:1.5px solid #b59a5b;border-radius:11px;opacity:.75;pointer-events:none}
+.fc.live small{color:#8a6f2e}
+.fc.live i{color:#6e5a2c}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pbtn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:14px 14px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:left;font:inherit}
+.pbtn b{font-size:16px;font-weight:700}
+.pbtn span{font-size:12px;color:var(--mute)}
+.pbtn:active{filter:brightness(1.15)}
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.gc{position:relative;aspect-ratio:.62;border-radius:14px;display:flex;align-items:center;justify-content:center;text-align:center;background:radial-gradient(ellipse 75% 55% at 50% 52%,rgba(130,105,70,.16),transparent 72%),linear-gradient(168deg,#f4eee2,#e8dfce);color:#241b0d;border:1px solid #e2d6bc;box-shadow:0 10px 18px -4px rgba(0,0,0,.55),0 3px 6px rgba(0,0,0,.35)}
+.gc::before{content:'';position:absolute;inset:6px;border:1.4px solid #b59a5b;border-radius:9px;opacity:.75;pointer-events:none}
+.gc.unk{background:#24201c;color:#6f665a;border-color:#3a332b;box-shadow:none}
+.gc.unk::before{border-color:#4a4137;opacity:.6}
+.gc.unk b{font-size:34px;font-weight:700;max-width:none}
+.gc small{position:absolute;top:11%;left:0;right:0;text-align:center;font-size:8.5px;letter-spacing:1.8px;font-weight:800;text-transform:uppercase;color:#8a6f2e}
+.gc b{font-size:14.5px;font-weight:800;line-height:1.15;max-width:78%;letter-spacing:-.2px;hyphens:manual;-webkit-hyphens:manual;overflow-wrap:normal;word-break:normal}
+/* suspect portrait cards: portrait fills the whole card, no cream rim */
+.fc.art,.gc.art{overflow:hidden;background:#000!important;border:0!important}
+.fc.art::before,.gc.art::before{display:none}
+.art .pic{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;pointer-events:none;-webkit-user-select:none;user-select:none}
+.art small{z-index:3;top:0!important;left:0!important;right:0!important;padding:16px 0 22px;background:linear-gradient(rgba(10,8,5,.72),transparent);color:#e3d5b3!important}
+.gc.art small{padding:9px 0 16px}
+.art b{position:absolute;z-index:3;left:0;right:0;bottom:0;max-width:none!important;padding:30px 6px 14px;background:linear-gradient(transparent,rgba(10,8,5,.9) 62%);color:#f6efe0}
+.gc.art b{padding:22px 4px 9px;font-size:13.5px}
+.fc.art:has(i) b{padding-bottom:30px}
+.fc.k1.art b,.fc.k2.art b{font-size:16px;line-height:1.1}
+.fc.art i{z-index:4;bottom:12px;color:#e3d5b3!important}
+.fc.art:not(.live) .pic{filter:grayscale(1) brightness(.42)}
+.fc.art:not(.live) b{color:#a79d8b}
+.fc.art .clown{position:absolute;z-index:4;top:50%;left:0;right:0;margin:0;text-align:center;font-size:38px;transform:translateY(-50%)}
+.qm{display:inline-block;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);font-size:10.5px;font-weight:800;line-height:13px;text-align:center;vertical-align:1px}
+.fc.tap{cursor:pointer}
+.fc.tap:active{filter:brightness(.92)}
+.dirrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.dirrow>span:first-child{font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.dbtn{border:0;background:var(--bg);color:var(--mute);padding:8px 16px;display:flex;align-items:center;cursor:pointer}
+.dbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.dbtn.on{background:var(--ink);color:var(--bg)}
+.dirord{margin:6px 0 0;font-size:12.5px}
+.upnext{flex:0 0 100%;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mute)}
+.upnext svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ask .who{font-size:34px;font-weight:800;margin:4px 0 2px}
+table.tt{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px}
+.tt th{font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--mute);font-weight:600;text-align:left;padding:2px 3px 8px;border-bottom:1px solid var(--line)}
+.tt td{padding:9px 3px;vertical-align:middle;overflow-wrap:anywhere;line-height:1.25}
+.tt tr.r td{border-top:1px solid var(--line)}
+.tt tbody tr.r:first-child td{border-top:0}
+.tt tr.nt td{padding:0 3px 9px}
+.tt td.e{color:var(--mute)}
+.tt .n{color:var(--mute);font-variant-numeric:tabular-nums}
+.tt .x{text-align:right}
+.tt .x button{border:0;background:none;color:var(--bad);font-size:17px;cursor:pointer;padding:0 2px}
+.tt .pn,.tt .sp{padding:0 5px;font-size:11px;white-space:nowrap}
+.tt th:nth-child(1){width:4%}.tt th:nth-child(2){width:10%}.tt th:nth-child(3){width:22%}.tt th:nth-child(4){width:21%}.tt th:nth-child(5){width:18%}.tt th:nth-child(6){width:16%}.tt th:nth-child(7){width:9%}
+.tt .spark{margin-top:3px}
+.ev{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.ev:first-child{border-top:0}
+.ev .n{color:var(--mute);min-width:22px;font-variant-numeric:tabular-nums}
+.ev .t{flex:1}
+.ev button{border:0;background:none;color:var(--bad);font-size:18px;cursor:pointer;padding:0 4px}
+.spark{color:var(--accent);font-size:12px;margin-top:2px}
+.cand{display:grid;grid-template-columns:1fr 44px;gap:8px;align-items:center;margin:8px 0}
+.cand .bar{width:100%;height:8px;border-radius:4px;margin-top:4px}
+.pct{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
+.ok{color:var(--ok);font-size:11px;font-weight:700;margin-left:6px}
+.banner{border-radius:12px;padding:12px 14px;margin-bottom:12px;background:var(--accent);color:var(--accent-ink)}
+.banner b{display:block;font-size:17px}
+details{border-top:1px solid var(--line);padding:8px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:650;padding:4px 0}
+.heat{display:inline-block;min-width:34px;text-align:center;border-radius:6px;padding:1px 4px}
+table.dt{width:100%;border-collapse:collapse;font-size:14px}
+table.dt td{padding:6px 4px;border-top:1px solid var(--line)}
+table.dt td:last-child{text-align:right}
+table.dt tr.tap{cursor:pointer}
+table.dt tr.tap:active td{background:rgba(193,155,87,.1)}
+
+/* player + suspect pills */
+.pn{display:inline-block;border:1.5px solid var(--red);color:var(--red);border-radius:999px;padding:1px 10px;font-size:13px;font-weight:600;white-space:nowrap;line-height:1.5}
+.sp{display:inline-block;border:1px solid transparent;border-radius:999px;padding:1px 10px;font-weight:650;font-size:.92em;white-space:nowrap;line-height:1.5}
+.sp0{background:var(--bg);border-color:var(--line);color:var(--ink)}
+.evl{display:flex;flex-wrap:wrap;align-items:center;gap:4px 3px;font-size:13px}
+.evl .pn{padding:0 7px;font-size:12px}
+.evl .sp{padding:0 7px;font-size:12px}
+.evl .res{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex-wrap:nowrap}
+.ev{gap:6px}
+.ev .n{min-width:16px}
+.evl .sep{color:var(--mute)}
+.cds .sep{margin:0 3px}
+.evsub{font-size:12px;color:var(--mute);margin-top:3px}
+.crow.elim .sp{text-decoration:line-through;opacity:.5}
+.chip.sus{border-color:transparent;font-weight:650}
+.chip.sus.on{box-shadow:0 0 0 3px var(--accent)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheet"></div>
+<div id="modal"></div>
+
+<script src="../portraits.js"></script>
+<script src="../solver.js"></script>
+<script>
+(function(){
+const S = ClueSolver;
+// Keys of its own: the standalone tracker shares this origin (akane-asahi.github.io), so the two never overwrite each other
+const KEY = 'clues-table-state-v2', KEY1 = 'clues-table-state-v1', ED_KEY = 'clues-table-editions-v1';
+const $app = document.getElementById('app'), $sheet = document.getElementById('sheet'), $modal = document.getElementById('modal');
+
+const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
+const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch(e){} };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let customEditions = [];
+try { customEditions = JSON.parse(lsGet(ED_KEY) || '[]') || []; } catch(e){}
+const allEditions = () => S.EDITIONS.concat(customEditions);
+
+/* ---------------- state ---------------- */
+function freshState(){
+  const st = { v:2, edition:S.EDITIONS[0], players:[{name:'Me',hand:0,me:true},{name:'Player 2',hand:0},{name:'Player 3',hand:0},{name:'Player 4',hand:0}],
+    me:0, myCards:[], faceUp:[], rules:{askAll:false, locate:true}, dir:'cw', handsAuto:true, events:[], announced:[], started:false };
+  recalc(st); return st;
+}
+const meIdx = st => Math.max(0, st.players.findIndex(p => p.me));
+function recalc(st){
+  if (!st.handsAuto) return;
+  const D = S.makeDeck(st.edition), n = st.players.length, total = D.N - 3 - st.faceUp.length;
+  const h0 = st.myCards.length || S.defaultHands(n, total)[0];
+  const rest = S.defaultHands(n - 1, total - h0);
+  const mi = Math.max(0, st.players.findIndex(p => p.me));
+  st.players[mi].hand = h0;
+  for (let k = 1; k < n; k++) st.players[(mi + k) % n].hand = rest[k-1];
+}
+function loadState(){
+  try {
+    const raw = lsGet(KEY);
+    if (raw) { const st = JSON.parse(raw); if (st && st.players) { st.rules = st.rules || {askAll:false, locate:true}; st.faceUp = st.faceUp || []; st.announced = st.announced || []; st.dir = st.dir === 'ccw' ? 'ccw' : 'cw'; if (!st.players.some(p => p.me)) st.players[0].me = true; st.first = st.first || 0; return st; } }
+    const old = lsGet(KEY1);
+    if (old) { const o = JSON.parse(old);
+      if (o && o.players) { const st = freshState(); st.players = o.players.map(p => ({name:p.name, hand:p.hand})); st.me = 0; st.myCards = o.myCards || []; st.events = o.events || [];
+        st.handsAuto = false; st.started = st.events.length > 0 || st.myCards.length > 0; return st; } }
+  } catch(e){}
+  return freshState();
+}
+let state = loadState();
+let D = S.makeDeck(state.edition), result = null;
+let ui = { by:null, sheet:null, rec:null, mark:null, detail:null, edit:null, sel:[null,null,null] };
+window.__clues = { openDetail: c => { ui.detail = c; ui.sheet = 'detail'; render(); } };  // test hook; the UI opens details by a 3 s hold
+
+function compute(){
+  D = S.makeDeck(state.edition);
+  try { result = S.analyse(state); if (result.ok && state.started) { result.bestBy = {}; result.best = S.bestSuggestions(result, state, 1)[0] || null; result.bestBy.any = result.best; } } catch(e){ result = { ok:false, error:'Solver error: ' + e.message }; }
+}
+const save = () => lsSet(KEY, JSON.stringify(state));
+function commit(){ recalc(state); save(); compute(); checkSolved(); render(); }
+
+function checkSolved(){
+  if (!state.started || !result || !result.ok) return;
+  const news = [];
+  result.envelope.forEach((list,k) => { if (list.length === 1 && !state.announced.includes(k)) { state.announced.push(k); news.push([k, list[0].card]); } });
+  if (news.length) { save(); ui.modal = { type:'solved', items:news }; }
+}
+
+/* ---------------- helpers ---------------- */
+const nm = i => (state.players[i] && state.players[i].name || ('P'+(i+1))).trim() || ('P'+(i+1));
+function inits(){
+  // your own column is never shown, so only the other players need distinct initials
+  const names = state.players.map((_,i) => nm(i).toUpperCase());
+  return names.map((n,i) => {
+    for (let k = 1; k <= 2; k++) {
+      const x = n.slice(0,k);
+      if (!names.some((m,j) => j !== i && j !== 0 && m.slice(0,k) === x)) return x;
+    }
+    return n.slice(0,1) + (i+1);
+  });
+}
+const catOf = c => D.catOf(c);
+const SUS_COLORS = { scarlett:['#c62828','#ffffff'], mustard:['#e1ad01','#231a00'], white:['#ffffff','#222222','#b9b4aa'],
+  green:['#2e7d32','#ffffff'], peacock:['#1565c0','#ffffff'], plum:['#7b1fa2','#ffffff'] };
+function susKey(c){
+  if (catOf(c) !== 0) return null;
+  return D.CARDS[c].toLowerCase().replace(/^(miss|mrs\.?|mr\.?|colonel|professor|prof\.?)\s+/, '').trim();
+}
+function susColor(c){
+  const key = susKey(c);
+  return key ? SUS_COLORS[key] || null : null;
+}
+function picHtml(c){
+  const src = portrait(c);
+  return src ? '<img class="pic" alt="" src="'+src+'" draggable="false">' : '';
+}
+function portrait(c){
+  if (!window.CLUE_PORTRAITS) return null;
+  const k = catOf(c);
+  let key = null;
+  if (k === 0) key = susKey(c);
+  else if (k === 1 || k === 2) {
+    key = D.CARDS[c].toLowerCase().replace(/[^a-z]/g, '');
+    key = { dagger:'knife', spanner:'wrench', leadpiping:'leadpipe', billiard:'billiardroom', dining:'diningroom' }[key] || key;
+  }
+  return key ? window.CLUE_PORTRAITS[key] || null : null;
+}
+let shortsFor = null, shorts = null;
+function shortName(c){
+  if (shortsFor !== D) {
+    shortsFor = D;
+    const raw = D.CARDS.map((n,i) => { const k = catOf(i);
+      if (k === 1 && /\s/.test(n)) return n.split(/\s+/).pop();
+      if (k === 2) return n.replace(/\s+Room$/i, '');
+      return n; });
+    shorts = raw.map((x,i) => raw.filter(y => y === x).length > 1 ? D.CARDS[i] : x);
+  }
+  return shorts[c];
+}
+function cardHtml(c, short){
+  const name = short ? shortName(c) : D.CARDS[c];
+  if (catOf(c) !== 0) return esc(name);
+  const col = susColor(c);
+  if (!col) return '<span class="sp sp0">'+esc(name)+'</span>';
+  return '<span class="sp" style="background:'+col[0]+';color:'+col[1]+(col[2]?';border-color:'+col[2]:'')+'">'+esc(name)+'</span>';
+}
+// Short tags for the Turns table: P2 for default names, 1st letter for custom names, 2+ letters if they clash
+function tagList(){
+  const n = state.players.length, tg = new Array(n), L = new Array(n).fill(1), cust = [];
+  state.players.forEach((p, i) => {
+    const raw = (p && p.name || '').trim();
+    const m = /^player\s*(\d+)$/i.exec(raw);
+    if (i === (state.me || 0)) tg[i] = 'Me';
+    else if (!raw) tg[i] = 'P'+(i+1);
+    else if (m) tg[i] = 'P'+m[1];
+    else cust.push(i);
+  });
+  const pre = i => { const r = state.players[i].name.trim(); const t = r.slice(0, L[i]); return t.charAt(0).toUpperCase() + t.slice(1); };
+  for (let pass = 0; pass < 12; pass++) {
+    const g = {};
+    cust.forEach(i => { const k = pre(i).toLowerCase(); (g[k] = g[k] || []).push(i); });
+    let changed = false;
+    Object.keys(g).forEach(k => { if (g[k].length > 1) g[k].forEach(i => { if (L[i] < state.players[i].name.trim().length) { L[i]++; changed = true; } }); });
+    if (!changed) break;
+  }
+  cust.forEach(i => { tg[i] = pre(i); });
+  return tg;
+}
+const pn = i => '<span class="pn">'+esc(nm(i))+'</span>';
+
+function cardChips(kind, selected, opts){
+  opts = opts || {};
+  let h = '';
+  [0,1,2].forEach(k => {
+    h += '<div class="muted" style="margin:10px 0 4px">'+S.CAT_PLURAL[k]+'</div><div class="chips">';
+    for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
+      const on = Array.isArray(selected) ? selected.includes(c) : selected && selected[k] === c;
+      const off = opts.disabled && opts.disabled(c);
+      const col = susColor(c);
+      const style = col ? ' style="background:'+col[0]+';color:'+col[1]+(col[2]?';border:1px solid '+col[2]:'')+'"' : '';
+      h += '<span class="chip'+(col?' sus':'')+(on?' on':'')+(off?' off':'')+'"'+style+' data-act="'+kind+'" data-c="'+c+'" data-k="'+k+'">'+esc(D.CARDS[c])+'</span>';
+    }
+    h += '</div>';
+  });
+  return h;
+}
+function suggestersOf(c){
+  const out = [];
+  let n = 0;
+  state.events.forEach(ev => { if (ev.type === 'suggest' || ev.type === 'accuse') n++; if (ev.type === 'suggest' && ev.cards.includes(c)) out.push({turn:n, by:ev.by}); });
+  return out;
+}
+const isTurn = e => e.type === 'suggest' || e.type === 'accuse';
+const turnNo = () => state.events.filter(isTurn).length + 1;
+const canEditSetup = () => state.events.length === 0;
+
+/* ---------------- setup ---------------- */
+function rulesHtml(inGame){
+  const fu = state.faceUp;
+  let h = '<div class="switch"><div><b>Ask everyone, even after a card is shown</b><div class="muted">House rule: every other player answers each suggestion.</div></div><button class="tog'+(state.rules.askAll?' on':'')+'" data-act="rule-askAll" aria-label="Toggle"></button></div>';
+  h += '<div class="switch"><div><b>Locate cards for me</b><div class="muted">Marks 👁️ or a moon in the turns list when it can tell which card was shown.</div></div><button class="tog'+(state.rules.locate?' on':'')+'" data-act="rule-locate" aria-label="Toggle"></button></div>';
+  h += '<div style="padding-top:10px;border-top:1px solid var(--line)"><b>Face-up cards</b><div class="muted">Cards dealt face up (or set aside, as in some 2-player rules). Tap to mark. '+fu.length+' selected.</div>';
+  h += cardChips('faceup', fu, {disabled: c => state.myCards.includes(c)});
+  h += '</div>';
+  return h;
+}
+function handsHtml(){
+  const fu = state.faceUp;
+  let h = '<div class="muted">'+(state.handsAuto?'Automatic: your count is exact and any extra cards go to players in seat order. Change a number if you know who really got extras.':'Set by hand.')+'</div>';
+  state.players.forEach((p,i) => {
+    h += '<div class="row" style="margin-top:8px"><span class="grow">'+esc(nm(i))+(i===0?' (you)':'')+'</span><div class="stepper"><button class="sm" data-act="hand-" data-i="'+i+'">−</button><b>'+p.hand+'</b><button class="sm" data-act="hand+" data-i="'+i+'">+</button></div></div>';
+  });
+  const total = state.players.reduce((a,p)=>a+p.hand,0), want = D.N - 3 - fu.length;
+  if (total !== want) h += '<div class="warn">These add up to '+total+' — they must add up to '+want+'.</div>';
+  if (!state.handsAuto) h += '<button class="btn ghost" data-act="hands-auto">Back to automatic</button>';
+  return h;
+}
+function handsFooter(){
+  const total = state.players.reduce((a,p)=>a+p.hand,0), want = D.N - 3 - state.faceUp.length;
+  let h = '<div class="muted" style="margin-top:6px">The number on each row is how many cards that player holds. '+(state.handsAuto?'Automatic: your count is exact and extra cards go to players in seat order. Tap − or + if you know better.':'Set by hand.')+'</div>';
+  if (total !== want) h += '<div class="warn">These add up to '+total+' — they must add up to '+want+'.</div>';
+  if (!state.handsAuto) h += '<button class="btn ghost" data-act="hands-auto">Back to automatic</button>';
+  return h;
+}
+const ICON_CW = '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+const ICON_CCW = '<svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+const dirStep = () => state.dir === 'ccw' ? -1 : 1;
+function seatAfter(i, k){ const n = state.players.length; return (((i + dirStep()*k) % n) + n) % n; }
+function nextBy(){
+  if (ui.by != null && ui.by < state.players.length) return ui.by;
+  return autoBy();
+}
+function autoBy(){
+  const n = state.players.length;
+  let last = -1; const out = new Set();
+  state.events.forEach(e => { if (e.type === 'accuse') out.add(e.by); });
+  for (let k = state.events.length - 1; k >= 0; k--) { const e = state.events[k]; if (e.type === 'suggest' || e.type === 'accuse') { last = e.by; break; } }
+  if (last < 0) return state.first || 0;
+  for (let k = 1; k <= n; k++) { const c = seatAfter(last, k); if (!out.has(c) || out.size >= n) return c; }
+  return seatAfter(last, 1);
+}
+function dirHtml(){
+  const ccw = state.dir === 'ccw', n = state.players.length;
+  const seq = []; for (let k = 0; k < n; k++) seq.push(esc(nm(seatAfter(0, k))));
+  return '<div class="dirrow"><span>Direction of play</span><span class="seg">'
+    + '<button class="dbtn'+(ccw?' on':'')+'" data-act="dir" data-d="ccw" aria-label="Anticlockwise">'+ICON_CCW+'</button>'
+    + '<button class="dbtn'+(!ccw?' on':'')+'" data-act="dir" data-d="cw" aria-label="Clockwise">'+ICON_CW+'</button></span></div>'
+    + '<p class="muted dirord">'+(ccw?'Anticlockwise: ':'Clockwise: ')+seq.join(' → ')+' → …</p>';
+}
+function setupView(){
+  const n = state.players.length;
+  const total = D.N - 3 - state.faceUp.length;
+  const lo = Math.floor(total / n), hi = Math.ceil(total / n);
+  const mineOk = state.handsAuto ? (state.myCards.length >= lo && state.myCards.length <= hi) : state.myCards.length === state.players[meIdx(state)].hand;
+  let h = '<header><button class="ib" data-act="online" aria-label="Back to Clues online">‹</button><h1>New game</h1><button class="ib" data-act="help" aria-label="Help">?</button></header><main>';
+  h += '<section class="card" id="sec-players"><h2>Who\'s playing?</h2><p class="muted" style="margin-top:0">List everyone in the order they\'re sitting. The first row plays first (it doesn\'t have to be you). Press and hold a row for 3 seconds, then drag to reorder. Set how many cards each player holds on the right.</p>';
+  state.players.forEach((p,i) => {
+    h += '<div class="prow"><span class="num"'+' data-drag="'+i+'" aria-label="Drag to reorder"'+'>'+(i+1)+'</span><input type="text" data-name="'+i+'" value="'+esc(p.name)+'" maxlength="16">';
+    h += '<span class="stepper"><button class="sm" data-act="hand-" data-i="'+i+'" aria-label="Fewer cards">−</button><b>'+p.hand+'</b><button class="sm" data-act="hand+" data-i="'+i+'" aria-label="More cards">+</button></span>';
+    if (p.me) h += '<span class="tag">You</span>';
+    else h += '<button class="sm" data-act="rm" data-i="'+i+'"'+(n<=2?' disabled style="opacity:.3"':'')+' aria-label="Remove player">✕</button>';
+    h += '</div>';
+  });
+  if (n < 6) h += '<button class="btn ghost" data-act="add">+ Add player</button>';
+  h += handsFooter();
+  h += dirHtml();
+  h += '</section>';
+  h += '<section class="card" id="sec-cards"><h2>Your cards ('+state.myCards.length+(state.handsAuto?' of '+(lo===hi?lo:lo+'–'+hi):'')+')</h2><p class="muted" style="margin-top:0">Pick every card you were dealt.</p>'+cardChips('mycard', state.myCards, {disabled: c => state.faceUp.includes(c)})+'</section>';
+  h += '<section class="card"><h2>Edition</h2><select data-act="edition">'+allEditions().map(e => '<option value="'+esc(e.id)+'"'+(e.id===state.edition.id?' selected':'')+'>'+esc(e.name)+' ('+(e.suspects.length+e.weapons.length+e.rooms.length)+' cards)</option>').join('')+'</select>';
+  h += '<button class="btn ghost" data-act="edition-new">+ Add an edition</button>';
+  h += '<p class="muted">Not listed? Add your own card names. Saved on this device.</p></section>';
+  h += '<section class="card"><details><summary>Rules and face-up cards</summary>'+rulesHtml(false)+'</details></section>';
+  let label = 'Create Game';
+  const handTotal = state.players.reduce((a,p)=>a+p.hand,0), handWant = total;
+  const handsOk = handTotal === handWant;
+  const mine = state.myCards.length;
+  const myLo = state.handsAuto ? lo : state.players[meIdx(state)].hand, myHi = state.handsAuto ? hi : state.players[meIdx(state)].hand;
+  const range = myLo === myHi ? ''+myLo : myLo+' or '+myHi;
+  if (!mineOk) {
+    const diff = mine < myLo ? myLo - mine : mine - myHi;
+    label = (mine < myLo ? 'Pick your cards: ' : 'Too many cards: ')+mine+' selected, you hold '+range;
+  } else if (!handsOk) label = 'Cards per player must add up to '+handWant+' ('+handTotal+' now)';
+  h += '</main><div class="bottom"><button class="btn'+(mineOk&&handsOk?'':' dim')+'" data-act="'+(mineOk&&handsOk?'create':(!mineOk?'goto-cards':'goto-players'))+'">'+esc(label)+'</button></div>';
+  return h;
+}
+
+/* ---------------- game ---------------- */
+function gameView(){
+  let h = '<header><button class="ib" data-act="turns" aria-label="Turns">☰</button><h1>Turn '+turnNo()+' <span class="tdot">•</span> <span class="tname" data-act="who">'+esc(nm(nextBy()))+'</span></h1><button class="ib" data-act="help" aria-label="Help">ⓘ</button><button class="ib" data-act="menu" aria-label="Menu">⋯</button></header><main class="gm">';
+  if (!result || !result.ok) {
+    h += '<section class="card"><div class="err">'+esc(result ? result.error : 'Loading…')+'</div>'+(state.events.length?'<button class="btn" data-act="undo">Undo last entry</button>':'')+'</section>';
+    return h + '</main>';
+  }
+  const r = result, E = r.nP, ini = inits();
+  const cols = []; for (let i = 1; i < r.nSeats; i++) cols.push(i); if (r.hasTable) cols.push(r.nSeats);
+  const tmpl = '48px 1fr ' + cols.map(()=>'30px').join(' ');
+  // summary strip
+  const best = r.envelope.map(l => l[0]);
+  let located = 0; for (let c = 0; c < D.N; c++) if (r.certain[c] != null && r.certain[c] >= 0) located++;
+  h += '<div class="prog"><div class="tx">Located '+located+' out of '+D.N+' cards</div><div class="tr"><i style="width:'+Math.round(located/D.N*100)+'%"></i></div></div>';
+  h += '<section class="card sum" data-act="envelope"><div><div class="muted">'+(r.solved?'Envelope solved':'Best guess for the envelope')+'</div><b>'+best.map(x => cardHtml(x.card)).join(' · ')+'</b></div><span class="muted">'+r.envelope.map(l=>l.length).join(' · ')+' left ›</span></section>';
+  h += '<div class="paper">';
+  [0,1,2].forEach(k => {
+    h += '<div class="cathead" style="grid-template-columns:'+tmpl+'"><span style="grid-column:1/3">'+S.CAT_PLURAL[k]+'</span>'+cols.map(o => '<span class="i">'+(o===r.nSeats?'T':esc(ini[o]))+'</span>').join('')+'</div>';
+    for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
+      const mine = state.myCards.includes(c), fu = state.faceUp.includes(c);
+      const elim = !r.possible[c][E], solved = r.certain[c] === E;
+      const p = solved ? 1 : elim ? 0 : (r.prob ? r.prob[c][E] : 0);
+      const sg = suggestersOf(c);
+      const who = [...new Set(sg.map(s => s.by === 0 ? 'Me' : nm(s.by)))];
+      h += '<div class="crow'+(ui.sel[catOf(c)]===c?' sel':'')+(mine?' mine':'')+(elim?' elim':'')+(solved?' solved':'')+'" data-act="sel" data-c="'+c+'" style="grid-template-columns:'+tmpl+'">';
+      h += '<div><div class="pc">'+Math.round(p*100)+'%</div><div class="bar"><i style="width:'+Math.round(p*100)+'%"></i></div></div>';
+      h += '<div><div class="nm">'+cardHtml(c)+'</div><div class="sub">'+(mine||fu?'&nbsp;':(who.length?'💬 '+esc(who.join(', ')):'&nbsp;'))+'</div></div>';
+      if (mine || fu) { h += '<div class="tagw">'+(mine?'YOURS':'FACE UP')+'</div>'; h += '</div>'; continue; }
+      const pc = cols.map(o => (r.possible[c][o] && r.certain[c] !== o && r.prob) ? Math.round(r.prob[c][o] * 100) : -1);
+      const top = Math.max.apply(null, pc);
+      cols.forEach((o, ci) => {
+        if (!r.possible[c][o]) h += '<div class="c n">✕</div>';
+        else if (r.certain[c] === o) h += '<div class="c y">✓</div>';
+        else if (!r.prob) h += '<div class="c q">?</div>';
+        else h += '<div class="c pp'+(pc[ci] === top ? ' hi' : '')+'">'+pc[ci]+'%</div>';
+      });
+      h += '</div>';
+    }
+  });
+  const nb = nextBy(), picked = ui.sel.filter(x => x != null), bst = bestFor();
+  h += '</div></main><div class="dock">'
+    + (bst ? '<div class="best" data-act="use-best"><div class="bl">Best call <em>· ~'+Math.max(1,Math.round(bst.rel*100))+'% closer</em></div><div class="bp">'+bst.cards.map(c => '<span role="button" data-act="sel" data-c="'+c+'"'+(ui.sel[catOf(c)]===c?' class="on"':'')+'>'+esc(D.CARDS[c])+'</span>').join('')+'</div>'+(ui.sel[2]!=null?'<div class="inroom">for '+esc(D.CARDS[ui.sel[2]])+'</div>':'')+'</div>' : '')
+    + (picked.length && !(bst && picked.length === 3 && bst.cards.every(c => picked.includes(c))) ? '<div class="sp">'+picked.map(c => '<span>'+esc(D.CARDS[c])+'</span>').join('')+'</div>' : '')
+    + '<button class="btn" data-act="rec-start" data-by="'+nb+'">Submit Call</button></div>';
+  return h;
+}
+
+/* ---------------- sheets ---------------- */
+function sheetFrame(title, body, left){
+  return '<div class="scrim" data-act="scrim"><div class="sheet" data-stop="1"><div class="sheet-head"><button class="ib" data-act="close" aria-label="Close">✕</button><h3>'+esc(title)+'</h3>'+(left||'<span style="width:38px"></span>')+'</div><div class="sheet-body">'+body+'</div></div></div>';
+}
+
+/* soft hyphens so long words break "Candle-/stick" only when they do not fit */
+const HY_HINT = { candlestick:6, conservatory:6 };
+function softWord(w){
+  const n = w.length, lw = w.toLowerCase();
+  if (n < 9) return esc(w);
+  let at = HY_HINT[lw];
+  if (!at) {
+    const V = 'aeiouyAEIOUY'; let best = -1, bd = 99;
+    for (let i = 3; i <= n - 3; i++) {
+      const okSplit = V.includes(w[i-1]) && !V.includes(w[i]) || w[i-1] === w[i];
+      const d = Math.abs(i - n/2) + (okSplit ? 0 : 1.5);
+      if (d < bd) { bd = d; best = i; }
+    }
+    at = best;
+  }
+  return esc(w.slice(0, at)) + '&shy;' + esc(w.slice(at));
+}
+const softName = name => name.split(' ').map(softWord).join(' ');
+function recOrder(){ const n = state.players.length, o = []; for (let i = 1; i < n; i++) o.push(seatAfter(ui.rec.by, i)); return o; }
+function recStart(by){
+  ui.rec = { by: by === 'other' ? (nextBy() === 0 ? seatAfter(0,1) : nextBy()) : +by, cards:[null,null,null], step:'pick', responses:[], mine: by !== 'other' };
+  if (ui.sel.every(x => x != null)) { ui.rec.cards = ui.sel.slice(); ui.rec.step = 'ask'; }
+  else ui.rec.cards = ui.sel.slice();
+  ui.sheet = 'record';
+}
+function recFinish(){
+  const rec = ui.rec;
+  state.events.push({ type:'suggest', by:rec.by, cards:rec.cards.slice(), responses: rec.responses.map(r => { const o = {p:r.p, r:r.r}; if (r.card != null) o.card = r.card; return o; }) });
+  ui.rec = null; ui.sheet = null; ui.by = null; ui.sel = [null,null,null]; commit();
+}
+function recAdvance(){
+  const rec = ui.rec, order = recOrder();
+  for (;;) {
+    const last = rec.responses[rec.responses.length - 1];
+    if (last && last.r === 'showed' && !state.rules.askAll) return recFinish();
+    if (rec.responses.length >= order.length) return recFinish();
+    const p = order[rec.responses.length];
+    if (p === 0) {
+      const held = rec.cards.filter(c => state.myCards.includes(c));
+      if (held.length) return render();       // you choose which one to show, even if it's just one
+      rec.responses.push(held.length ? { p, r:'showed', card:held[0], auto:true } : { p, r:'none', auto:true });
+      continue;
+    }
+    return render();
+  }
+}
+function bestFor(){
+  if (!result || !result.ok) return null;
+  const room = ui.sel[2];
+  if (room == null) return result.best;
+  const k = 'r' + room;
+  if (!(k in result.bestBy)) result.bestBy[k] = S.bestSuggestions(result, state, 1, room)[0] || null;
+  return result.bestBy[k];
+}
+function whoSheet(){
+  let b = '<p class="muted">Who is making the next suggestion?</p><div class="chips">';
+  state.players.forEach((p,i) => { b += '<button class="chip'+(nextBy()===i?' on':'')+'" data-act="who-set" data-i="'+i+'">'+esc(nm(i))+(i===0?' (you)':'')+'</button>'; });
+  b += '</div>';
+  if (ui.by != null) b += '<button class="btn ghost" data-act="who-auto">Back to automatic ('+esc(nm(autoBy()))+')</button>';
+  return sheetFrame('Whose turn?', b);
+}
+function recordSheet(){
+  const rec = ui.rec;
+  const isMine = rec.by === 0;
+  if (rec.step === 'pick') {
+    let b = '<div class="muted" style="margin-bottom:6px">Who is suggesting?</div><div class="pills">';
+    state.players.forEach((p,i) => { b += '<button class="pill'+(rec.by===i?' on':'')+'" data-act="rec-by" data-i="'+i+'">'+esc(nm(i))+(i===0?' (you)':'')+'</button>'; });
+    b += '</div>'+cardChips('rec-card', rec.cards);
+    b += '<button class="btn" data-act="rec-next"'+(rec.cards.every(c=>c!=null)?'':' disabled')+'>Next: ask the players</button>';
+    return sheetFrame(isMine ? 'Your suggestion' : nm(rec.by)+'\'s suggestion', b);
+  }
+  const order = recOrder();
+  const cur = order[rec.responses.length];
+  // Cards I have already shown this asker (from earlier turns), so I can show the same one again.
+  const seen = new Set();
+  if (cur === 0 && !isMine) state.events.forEach(ev => { if (ev.type === 'suggest' && Number(ev.by) === Number(rec.by)) S.responsesOf(ev, state.players.length).forEach(r => { if (Number(r.p) === 0 && r.r === 'showed' && r.card != null) seen.add(Number(r.card)); }); });
+  let b = '<div class="pills">';
+  order.forEach((p,i) => {
+    const rs = rec.responses[i];
+    const label = nm(p) + (p===0?' (you)':'') + (rs ? ' · ' + (rs.r==='none'?'Has none':rs.r==='showed'?'Showed':'Refused') : '');
+    b += '<span class="pill'+(i===rec.responses.length?' on':'')+(rs?' done':'')+'">'+esc(label)+'</span>';
+  });
+  b += '</div>';
+  const youShow = cur === 0 && !isMine;
+  b += '<div class="ask"><div class="muted">'+(isMine?'You\'re asking':esc(nm(rec.by))+' is asking')+'</div><div class="who">'+esc(youShow?'You':nm(cur))+'</div><div class="muted">'+(youShow?'Pick the card you show':'if they have any of these')+'</div></div>';
+  b += '<div class="fan">'+rec.cards.map((c,i) => {
+    const bluff = rec.by !== 0 && result && result.ok && result.certain[c] === rec.by;
+    const dead = youShow ? !state.myCards.includes(c) : state.myCards.includes(c) || state.faceUp.includes(c) || bluff, live = !dead, tap = live && (isMine || youShow);
+    return '<div class="fc k'+i+(live?' live':'')+(tap?' tap':'')+(portrait(c)?' art':'')+'"'+(tap?' data-act="rec-show" data-c="'+c+'"':'')+'><div class="in">'+picHtml(c)+'<small>'+S.CAT_NAMES[i]+'</small>'+(youShow && seen.has(c) ? '<span class="seen" title="You showed them this card before">👁️</span>' : '')+'<b>'+softName(D.CARDS[c])+'</b>'+(tap&&youShow?'<i>Tap to show</i>':'')+(bluff?'<span class="clown" title="Bluff: the suggester holds this card">🤡</span>':'')+'</div></div>';
+  }).join('')+'</div>';
+  if (youShow) {
+    b += '<p class="muted" style="text-align:center">Tap the card you show '+esc(nm(rec.by))+'. The others stay hidden, and the Turns table will remember which one you showed.</p>';
+  } else if (isMine) {
+    b += '<p class="muted" style="text-align:center">Tap the card '+esc(nm(cur))+' showed you. If they have none, you\'ll ask the next player.</p>';
+    b += '<button class="btn ghost" data-act="rec-none">'+esc(nm(cur))+' has none of these</button>';
+  } else {
+    b += '<p class="muted" style="text-align:center">You won\'t see which card '+esc(nm(cur))+' shows.</p>';
+    b += '<div class="row"><button class="btn grow" data-act="rec-showed">Showed a card</button><button class="btn ghost grow" data-act="rec-none">Has none</button></div>';
+  }
+  return sheetFrame(isMine ? 'Your suggestion' : nm(rec.by)+'\'s suggestion', b);
+}
+function recBack(){
+  const rec = ui.rec;
+  if (!rec.responses.length) { rec.step = 'pick'; return; }
+  let x = rec.responses.pop();
+  while (x && x.auto && rec.responses.length) x = rec.responses.pop();
+}
+
+// Moon for a card that might be the shown one: how likely the showing player holds it.
+// 🌕 almost certain (90%+), 🌖 more than half (50–90%), 🌗 about even (45–55%), 🌘 less likely (under 45%).
+function moonFor(p){
+  if (p == null) return '✨';
+  const moon = p >= 0.9 ? '🌕' : p > 0.5 ? '🌖' : p >= 0.45 ? '🌗' : '🌘';
+  return '<span title="Chance they hold it: '+Math.round(p*100)+'%">'+moon+'</span>';
+}
+
+function turnsSheet(){
+  if (!state.events.length) return sheetFrame('Turns', '<p class="muted">Nothing recorded yet.</p>');
+  const loc = result && result.ok && state.rules.locate ? result.located : [];
+  let spk = new Map(), eye = new Set(), qm = new Set();
+  const cell = c => c == null ? '<td class="e">–</td>' : '<td>'+(catOf(c) === 0 ? cardHtml(c, true) : softName(shortName(c)))+(eye.has(c) ? '&nbsp;👁️' : spk.has(c) ? '&nbsp;'+spk.get(c) : '')+(qm.has(c) ? '&nbsp;<span class="qm" title="Only this player or the envelope can hold it">?</span>' : '')+'</td>';
+  const tgs = tagList(), tp = i => '<span class="pn">'+esc(tgs[i])+'</span>';
+  const tn = []; let cnt = 0; state.events.forEach((e, k) => { tn[k] = isTurn(e) ? ++cnt : null; });
+  let t = '<table class="tt"><thead><tr><th>#</th><th>By</th><th>Suspect</th><th>Weapon</th><th>Room</th><th>Showed</th><th></th></tr></thead><tbody>';
+  for (let i = state.events.length - 1; i >= 0; i--) {
+    const ev = state.events[i];
+    const by = tp(ev.type === 'has' ? ev.p : ev.by);
+    const byCat = {}; (ev.type === 'has' ? [ev.card] : ev.cards).forEach(c => { byCat[catOf(c)] = c; });
+    let ans, note = [];
+    if (ev.type === 'accuse') ans = '<span class="muted">Accused</span>';
+    else if (ev.type === 'has') ans = '<span class="muted">Marked</span>';
+    else {
+      const rs = S.responsesOf(ev, state.players.length);
+      const shown = rs.filter(r => r.r === 'showed');
+      ans = shown.length ? shown.map(r => tp(r.p)).join(' ') : '<span class="muted">Nobody</span>';
+      const none = rs.filter(r => r.r === 'none').map(r => nm(r.p));
+      const ref = rs.filter(r => r.r === 'refused').map(r => nm(r.p));
+      if (none.length) note.push('Passed: '+none.map(esc).join(', '));
+      if (ref.length) note.push('Refused: '+ref.map(esc).join(', '));
+    }
+    // 👁 = the shown card is known (you recorded it, or the app narrowed it to one card); a moon = narrowed to two,
+    // and the moon shows how likely that card is in the player's hand
+    spk = new Map(); eye = new Set();
+    if (ev.type === 'suggest') S.responsesOf(ev, state.players.length).forEach(r => { if (r.r === 'showed' && r.card != null) eye.add(r.card); });
+    loc.filter(l => l.ev === i).forEach(l => l.cards.forEach(c => {
+      if (l.cards.length === 1) eye.add(c);
+      else spk.set(c, moonFor(result.prob ? result.prob[c][l.p] : null));
+    }));
+    qm = new Set();
+    if (ev.type === 'suggest' && result && result.ok) {
+      const r = result, E = r.nP;
+      ev.cards.forEach(c => {
+        if (r.certain[c] != null && r.certain[c] >= 0) return;          // already known
+        if (!r.possible[c][E] || !r.possible[c][ev.by]) return;         // needs envelope + the caller
+        for (let o = 0; o < r.nSeats + (r.hasTable ? 1 : 0); o++) if (o !== ev.by && r.possible[c][o]) return;
+        qm.add(c);
+      });
+    }
+    t += '<tr class="r"><td class="n">'+(tn[i] == null ? '·' : tn[i])+'</td><td>'+by+'</td>'+cell(byCat[0])+cell(byCat[1])+cell(byCat[2])+'<td>'+ans+'</td><td class="x"><button data-act="del" data-i="'+i+'" aria-label="Delete entry">✕</button></td></tr>';
+    if (note.length) t += '<tr class="nt"><td></td><td colspan="6"><div class="evsub">'+note.join(' · ')+'</div></td></tr>';
+  }
+  t += '</tbody></table>';
+  return sheetFrame('Turns', t);
+}
+
+function detailSheet(){
+  const c = ui.detail, r = result;
+  const E = r.nP, k = catOf(c);
+  const solved = r.certain[c] === E, elim = !r.possible[c][E];
+  const p = solved ? 1 : elim ? 0 : (r.prob ? r.prob[c][E] : 0);
+  let b = '<p class="muted" style="margin-top:0">'+S.CAT_NAMES[k]+(k===0?' &nbsp;'+cardHtml(c):'')+'</p>';
+  b += '<div class="cand"><div><b>Chance it\'s in the envelope</b><div class="bar"><i style="width:'+Math.round(p*100)+'%"></i></div></div><div class="pct">'+Math.round(p*100)+'%</div></div>';
+  b += '<h2 style="margin-top:14px">Who has it</h2><table class="dt">';
+  for (let o = 0; o < r.nSeats + (r.hasTable?1:0); o++) {
+    const label = o === r.nSeats ? 'Face up (table)' : nm(o) + (o===0?' (you)':'');
+    let st;
+    if (!r.possible[c][o]) st = '<span class="muted">No</span>';
+    else if (r.certain[c] === o) st = '<b style="color:var(--ok)">Has it</b>';
+    else st = '<span class="heat" style="background:rgba(var(--heat),'+(0.08+0.5*(r.prob?r.prob[c][o]:0)).toFixed(2)+')">'+(r.prob?Math.round(r.prob[c][o]*100)+'%':'?')+'</span>';
+    const markIdx = state.events.findIndex(e => e.type === 'has' && e.card === c && e.p === o);
+    const canMark = o >= 1 && o < r.nSeats && !state.myCards.includes(c) && !state.faceUp.includes(c) && (markIdx >= 0 || r.possible[c][o]);
+    if (markIdx >= 0) st = '<span class="muted" style="font-size:12px">marked &nbsp;</span>' + st;
+    b += '<tr'+(canMark ? ' class="tap" data-act="own" data-p="'+o+'" data-c="'+c+'"' : '')+'><td>'+esc(label)+'</td><td>'+st+'</td></tr>';
+  }
+  b += '</table>';
+  if (!state.myCards.includes(c) && !state.faceUp.includes(c)) b += '<p class="muted" style="font-size:12.5px;margin:8px 2px 0">Found out where it is another way? Tap a player to mark that they have it. Tap again to undo. Only if you\'re certain.</p>';
+  const sg = suggestersOf(c);
+  b += '<h2 style="margin-top:14px">Suggested</h2>'+(sg.length ? sg.map(s => '<div class="muted">Turn '+s.turn+' · '+esc(nm(s.by))+(s.by===0?' (you)':'')+'</div>').join('') : '<div class="muted">Not suggested yet.</div>');
+  return sheetFrame(D.CARDS[c], b);
+}
+
+function markSheet(){
+  const m = ui.mark;
+  let b = '<p class="muted" style="margin-top:0">Found out where a card is some other way? Mark it. Only do this if you\'re certain: a wrong mark can make later deductions wrong too.</p>';
+  if (m.card == null) {
+    b += cardChips('mark-card', [], {disabled: c => state.myCards.includes(c) || state.faceUp.includes(c)});
+  } else {
+    b += '<h3>'+esc(D.CARDS[m.card])+' is held by…</h3><div class="pills">';
+    for (let o = 1; o < state.players.length; o++) b += '<button class="pill" data-act="mark-set" data-p="'+o+'" data-c="'+m.card+'">'+esc(nm(o))+'</button>';
+    b += '</div><button class="btn ghost" data-act="mark-clear">Pick another card</button>';
+  }
+  return sheetFrame('Mark who has a card', b);
+}
+
+function accuseSheet(){
+  const a = ui.acc;
+  let b = '<div class="muted" style="margin-bottom:6px">Who accused (wrongly)?</div><div class="pills">';
+  state.players.forEach((p,i) => { b += '<button class="pill'+(a.by===i?' on':'')+'" data-act="acc-by" data-i="'+i+'">'+esc(nm(i))+'</button>'; });
+  b += '</div>'+cardChips('acc-card', a.cards);
+  b += '<button class="btn" data-act="acc-save"'+(a.cards.every(c=>c!=null)?'':' disabled')+'>Record wrong accusation</button>';
+  return sheetFrame('Wrong accusation', b);
+}
+
+function envelopeSheet(){
+  const r = result;
+  let b = r.solved ? '<div class="banner"><b>Envelope solved</b>'+r.envelope.map(l=>cardHtml(l[0].card)).join(' · ')+'</div>' : '';
+  r.envelope.forEach((list,k) => {
+    b += '<section class="card"><h2>'+S.CAT_NAMES[k]+' · '+list.length+' possible</h2>';
+    list.forEach(x => { const pc = x.p == null ? 0 : x.p * 100;
+      b += '<div class="cand"><div>'+cardHtml(x.card)+(x.certain?'<span class="ok">CERTAIN</span>':'')+'<div class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></div></div><div class="pct">'+(x.certain?'100%':pc.toFixed(0)+'%')+'</div></div>'; });
+    b += '</section>';
+  });
+  b += '<p class="muted">Percentages are sampled estimates over every deal consistent with your log. “Certain” and eliminations are exact.'+(r.uncertain?' (Some eliminations could not be fully verified.)':'')+'</p>';
+  return sheetFrame('Envelope', b);
+}
+
+function settingsSheet(){ return sheetFrame('Settings', rulesHtml(true)+'<h2 style="margin-top:16px">Turn order</h2>'+dirHtml()+'<h2 style="margin-top:16px">Player names</h2>'+namesHtml()+'<h2 style="margin-top:16px">Cards per player</h2>'+handsHtml()); }
+function namesHtml(){
+  return state.players.map((p, i) => '<div class="prow" style="margin-top:8px;grid-template-columns:26px minmax(0,1fr)"><span class="num" style="cursor:default">'+(i+1)+'</span><input type="text" data-name="'+i+'" value="'+esc(p.name)+'" maxlength="16" placeholder="Player '+(i+1)+'" aria-label="Name of player '+(i+1)+(i===0?' (you)':'')+'"></div>').join('');
+}
+
+function knownCards(i){
+  const out = [];
+  for (let c = 0; c < D.N; c++) {
+    if (i === state.me ? state.myCards.includes(c) : (result && result.ok && result.certain[c] === i)) out.push(c);
+  }
+  return out;
+}
+function playersSheet(){
+  let b = '<p class="muted" style="margin-top:0">Tap a player to see the cards you know they hold.</p><div class="pgrid">';
+  state.players.forEach((pl, i) => {
+    const k = knownCards(i).length, tot = i === state.me ? state.myCards.length : (pl.hand || 0);
+    b += '<button class="pbtn" data-act="player-open" data-i="'+i+'"><b>'+esc(nm(i))+(i===state.me?' (you)':'')+'</b><span>'+k+' of '+tot+' known</span></button>';
+  });
+  return sheetFrame('Players', b + '</div>');
+}
+function playerSheet(){
+  const i = ui.player, pl = state.players[i];
+  if (!pl) return playersSheet();
+  const cs = knownCards(i), tot = i === state.me ? state.myCards.length : (pl.hand || 0);
+  let b = '<p class="muted" style="margin-top:0">'+cs.length+' of '+tot+' cards known</p>';
+  const unk = Math.max(0, tot - cs.length);
+  b += '<div class="cgrid">'+cs.map(c => '<div class="gc'+(portrait(c)?' art':'')+'">'+picHtml(c)+'<small>'+S.CAT_NAMES[catOf(c)]+'</small><b>'+softName(D.CARDS[c])+'</b></div>').join('')+Array(unk).fill('<div class="gc unk" aria-label="Unknown card"><b>?</b></div>').join('')+'</div>';
+  return sheetFrame(nm(i)+(i===state.me?' (you)':''), b, '<button class="ib" data-act="players-open" aria-label="Back">‹</button>');
+}
+function menuSheet(){
+  let b = '<button class="btn ghost" data-act="players-open" style="margin-top:0">Players\' cards</button>';
+  b += '<button class="btn ghost" data-act="mark-open">Mark who has a card</button>';
+  b += '<button class="btn ghost" data-act="acc-open">Wrong accusation</button>';
+  b += '<button class="btn ghost" data-act="undo"'+(state.events.length?'':' disabled')+'>Undo last entry</button>';
+  b += '<button class="btn ghost" data-act="settings">Settings</button>';
+  b += '<button class="btn danger" data-act="newgame">New game</button>';
+  b += '<button class="btn ghost" data-act="online">Back to Clues online</button>';
+  return sheetFrame('Menu', b);
+}
+
+function helpSheet(){
+  const d = (t, body) => '<details><summary>'+t+'</summary>'+body+'</details>';
+  const b =
+    d('Starting a game','<p>List everyone in the order they sit; the first row plays first, and you can be any row (press and hold to drag). Pick the edition, then tap every card you were dealt. Create Game opens the card list.</p>') +
+    d('Recording a turn','<p>Tap <b>My suggestion</b> or <b>Someone else\'s</b>, choose the three cards, then answer for each player in turn order. For your own suggestion, tap the card you were shown, or say they had none. For someone else\'s, say whether each player showed a card. Your own answers are filled in from your hand.</p>') +
+    d('Reading the card list','<p>Each card shows its chance of being in the envelope. The columns are the other players: ✓ has it, ✕ can\'t have it, ? might. Tap a card for everything about it, including who suggested it.</p>') +
+    d('Marking who has a card','<p>If you learn where a card is some other way, use <b>Mark who has a card</b> in the menu or on the card\'s detail sheet. Only mark what you are certain of.</p>') +
+    d('Locating cards automatically','<p>With <b>Locate cards for me</b> on, the turns list works out which card another player showed. 👁️ marks the card that was shown: one you saw and recorded, or one the app has narrowed down to a single card. A moon means it is down to two possible cards, because the third was ruled out for that player. The moon shows how likely that card is in their hand: 🌕 almost certain, 🌖 more than half, 🌗 about even, 🌘 less likely.</p><p>A gold <span class="qm">?</span> after a card means it is a 50-50: everyone else is ruled out, so only the player who made that call, or the envelope, can have it.</p>') +
+    d('Face-up cards and other rules','<p>In Settings you can mark cards dealt face up (the table column T), and make every player answer even after someone shows a card.</p>') +
+    d('How the odds work','<p>The app tracks every possible deal that fits what you recorded. ✓ and ✕ are exact. Percentages are estimated by sampling those deals.</p>');
+  return sheetFrame('Help', b);
+}
+
+function editionSheet(){
+  const e = ui.edit;
+  let b = '<label class="l">Name</label><input type="text" data-ed="name" value="'+esc(e.name)+'" maxlength="30">';
+  [['suspects','Suspects (one per line)'],['weapons','Weapons (one per line)'],['rooms','Rooms (one per line)']].forEach(([k,l]) => {
+    b += '<label class="l">'+l+'</label><textarea data-ed="'+k+'">'+esc(e[k])+'</textarea>';
+  });
+  if (e.err) b += '<div class="err">'+esc(e.err)+'</div>';
+  b += '<button class="btn" data-act="edition-save">Save edition</button>';
+  return sheetFrame('Add an edition', b);
+}
+
+function renderSheet(){
+  if (!ui.sheet) { $sheet.innerHTML = ''; return; }
+  const prev = $sheet.querySelector('.sheet-body');
+  const top = prev ? prev.scrollTop : 0;
+  const map = { record:()=>recordSheet(), who:whoSheet, players:playersSheet, player:playerSheet, turns:turnsSheet, detail:detailSheet, mark:markSheet, accuse:accuseSheet, envelope:envelopeSheet, settings:settingsSheet, menu:menuSheet, help:helpSheet, edition:editionSheet };
+  let html = '';
+  try { html = map[ui.sheet](); } catch(e){ html = sheetFrame('Oops', '<div class="err">'+esc(e.message)+'</div>'); }
+  $sheet.innerHTML = html;
+  const nb = $sheet.querySelector('.sheet-body'); if (nb) nb.scrollTop = top;
+  const pl = $sheet.querySelector('.pills'), on = pl && pl.querySelector('.pill.on'); if (on) pl.scrollLeft = on.offsetLeft - (pl.clientWidth - on.offsetWidth)/2;
+}
+function renderModal(){
+  const m = ui.modal;
+  if (!m) { $modal.innerHTML = ''; return; }
+  let h;
+  if (m.type === 'solved') {
+    h = '<div class="dlg"><h3>Solved '+m.items.map(([k]) => S.CAT_NAMES[k]).join(' & ')+'</h3><div class="muted" style="letter-spacing:1.5px;text-transform:uppercase;font-size:11px">In the envelope</div><div class="bigrow'+(m.items.length>1?' multi':'')+'">'+
+      m.items.map(([k,c]) => portrait(c)
+        ? '<div class="bigcard art">'+picHtml(c)+'<small>'+S.CAT_NAMES[k]+'</small><b>'+softName(D.CARDS[c])+'</b></div>'
+        : '<div class="bigcard"><small>'+S.CAT_NAMES[k]+'</small>'+cardHtml(c)+'</div>').join('')+'</div><button class="btn" data-act="modal-ok">OK</button></div>';
+  } else if (m.type === 'continue') {
+    h = '<div class="dlg"><h3>Game in progress</h3><p class="muted">You have a game in progress. Would you like to continue it?</p><div class="row"><button class="btn ghost grow" data-act="continue-no">No</button><button class="btn grow" data-act="modal-ok">Yes</button></div></div>';
+  } else if (m.type === 'confirm') {
+    h = '<div class="dlg"><h3>'+esc(m.title)+'</h3><p class="muted">'+esc(m.text)+'</p><div class="row"><button class="btn ghost grow" data-act="modal-ok">Cancel</button><button class="btn grow" data-act="'+m.act+'">'+esc(m.label)+'</button></div></div>';
+  }
+  $modal.innerHTML = '<div class="modal">'+h+'</div>';
+}
+function render(){
+  $app.innerHTML = state.started ? gameView() : setupView();
+  renderSheet(); renderModal();
+}
+
+/* ---------------- actions ---------------- */
+function resetKeepPlayers(){
+  state.events = []; state.myCards = []; state.faceUp = []; state.announced = []; state.started = false; state.handsAuto = true; state.first = 0;
+}
+function toggle(arr, c){ const i = arr.indexOf(c); if (i >= 0) arr.splice(i,1); else arr.push(c); }
+function addEvent(ev){ state.events.push(ev); }
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  if (el.dataset.act === 'scrim' && e.target !== el) return;   // clicks inside the sheet
+  const a = el.dataset.act, i = +el.dataset.i, c = el.dataset.c != null ? +el.dataset.c : null;
+  switch (a) {
+    /* setup */
+    case 'add': if (state.players.length < 6) { state.players.push({name:'Player '+(state.players.length+1), hand:0}); commit(); } break;
+    case 'rm': if (state.players.length > 2) { state.players.splice(i,1); commit(); } break;
+    case 'up': if (i > 1) { const p = state.players; [p[i-1], p[i]] = [p[i], p[i-1]]; commit(); } break;
+    case 'down': if (i < state.players.length-1) { const p = state.players; [p[i+1], p[i]] = [p[i], p[i+1]]; commit(); } break;
+    case 'mycard': if (!state.faceUp.includes(c)) { toggle(state.myCards, c); commit(); } break;
+    case 'faceup': if (!state.myCards.includes(c)) { toggle(state.faceUp, c); commit(); } break;
+    case 'rule-askAll': state.rules.askAll = !state.rules.askAll; commit(); break;
+    case 'rule-locate': state.rules.locate = !state.rules.locate; commit(); break;
+    case 'hand+': case 'hand-': {
+      state.handsAuto = false;
+      state.players[i].hand = Math.max(0, Math.min(18, state.players[i].hand + (a === 'hand+' ? 1 : -1))); commit(); break; }
+    case 'goto-cards': { const t = document.getElementById('sec-cards'); if (t) t.scrollIntoView({behavior:'smooth', block:'start'}); break; }
+    case 'goto-players': { const t = document.getElementById('sec-players'); if (t) t.scrollIntoView({behavior:'smooth', block:'start'}); break; }
+    case 'dir': state.dir = el.dataset.d === 'ccw' ? 'ccw' : 'cw'; commit(); break;
+    case 'hands-auto': state.handsAuto = true; commit(); break;
+    case 'edition-new': ui.edit = { name:'', suspects:'', weapons:'', rooms:'' }; ui.sheet = 'edition'; render(); break;
+    case 'edition-save': {
+      const e = ui.edit, lines = s => s.split('\n').map(x => x.trim()).filter(Boolean);
+      const ed = { id:'custom-'+Date.now(), name:(e.name||'').trim() || 'Custom edition', suspects:lines(e.suspects), weapons:lines(e.weapons), rooms:lines(e.rooms) };
+      const bad = ['suspects','weapons','rooms'].find(k => ed[k].length < 2 || ed[k].length > 15);
+      if (bad) { e.err = 'Each group needs between 2 and 15 names ('+bad+').'; renderSheet(); break; }
+      customEditions.push(ed); lsSet(ED_KEY, JSON.stringify(customEditions));
+      state.edition = ed; state.myCards = []; state.faceUp = []; ui.sheet = null; ui.edit = null; commit(); break; }
+    case 'create':
+      { const n = state.players.length, mi = meIdx(state);
+        if (mi) state.players = state.players.slice(mi).concat(state.players.slice(0, mi));
+        state.first = (n - mi) % n; }
+      state.started = true; state.events = []; state.announced = []; ui.sheet = null; ui.by = null; commit(); window.scrollTo(0,0); break;
+    /* sheets open/close */
+    case 'close': ui.sheet = null; ui.rec = null; render(); break;
+    case 'scrim': ui.sheet = null; ui.rec = null; render(); break;
+    case 'help': ui.sheet = 'help'; render(); break;
+    case 'turns': ui.sheet = 'turns'; render(); break;
+    case 'who': ui.sheet = 'who'; render(); break;
+    case 'players-open': ui.sheet = 'players'; render(); break;
+    case 'player-open': ui.player = +el.dataset.i; ui.sheet = 'player'; render(); break;
+    case 'use-best': if (bestFor()) { ui.sel = bestFor().cards.slice().sort((x,y) => catOf(x)-catOf(y)); render(); } break;
+    case 'who-set': ui.by = +el.dataset.i; ui.sheet = null; render(); break;
+    case 'who-auto': ui.by = null; ui.sheet = null; render(); break;
+    case 'menu': ui.sheet = 'menu'; render(); break;
+    case 'online': location.href = '../'; break;
+    case 'settings': ui.sheet = 'settings'; render(); break;
+    case 'envelope': ui.sheet = 'envelope'; render(); break;
+    case 'sel': { const k = catOf(c); ui.sel[k] = ui.sel[k] === c ? null : c; render(); break; }
+    case 'detail': ui.detail = c; ui.sheet = 'detail'; render(); break;
+    case 'mark-open': ui.mark = {card:null}; ui.sheet = 'mark'; render(); break;
+    case 'mark-card': ui.mark.card = c; renderSheet(); break;
+    case 'mark-clear': ui.mark.card = null; renderSheet(); break;
+    case 'own': {
+      const p = +el.dataset.p, idx = state.events.findIndex(e => e.type === 'has' && e.card === c && e.p === p);
+      if (idx >= 0) state.events.splice(idx, 1); else addEvent({type:'has', p, card:c});
+      commit(); break;
+    }
+    case 'mark-set': addEvent({type:'has', p:+el.dataset.p, card:c}); ui.sheet = null; commit(); break;
+    case 'acc-open': ui.acc = {by:1, cards:[null,null,null]}; ui.sheet = 'accuse'; render(); break;
+    case 'acc-by': ui.acc.by = i; renderSheet(); break;
+    case 'acc-card': ui.acc.cards[+el.dataset.k] = c; renderSheet(); break;
+    case 'acc-save': addEvent({type:'accuse', by:ui.acc.by, cards:ui.acc.cards.slice(), correct:false}); ui.sheet = null; commit(); break;
+    case 'del': state.events.splice(i,1); commit(); break;
+    case 'undo': state.events.pop(); ui.sheet = null; ui.by = null; commit(); break;
+    case 'newgame': ui.sheet = null; ui.modal = {type:'confirm', title:'Start a new game?', text:'This erases the current game. Players and edition are kept.', act:'newgame-yes', label:'New game'}; render(); break;
+    case 'newgame-yes': resetKeepPlayers(); ui.modal = null; commit(); break;
+    case 'continue-no': ui.modal = null; resetKeepPlayers(); commit(); break;
+    case 'modal-ok': ui.modal = null; renderModal(); break;
+    /* record flow */
+    case 'rec-start': recStart(el.dataset.by); if (ui.rec.step === 'ask') recAdvance(); else render(); break;
+    case 'rec-by': ui.rec.by = i; renderSheet(); break;
+    case 'rec-card': ui.rec.cards[+el.dataset.k] = c; renderSheet(); break;
+    case 'rec-next': ui.rec.step = 'ask'; recAdvance(); break;
+    case 'rec-show': { const who = recOrder()[ui.rec.responses.length]; ui.rec.responses.push({p:who, r:'showed', card:c}); recAdvance(); break; }
+    case 'rec-showed': { const who = recOrder()[ui.rec.responses.length]; ui.rec.responses.push({p:who, r:'showed'}); recAdvance(); break; }
+    case 'rec-none': { const who = recOrder()[ui.rec.responses.length]; ui.rec.responses.push({p:who, r:'none'}); recAdvance(); break; }
+    case 'rec-refused': { const who = recOrder()[ui.rec.responses.length]; ui.rec.responses.push({p:who, r:'refused'}); recAdvance(); break; }
+    case 'rec-back': recBack(); renderSheet(); break;
+  }
+});
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.act === 'edition' && canEditSetup()) {
+    const ed = allEditions().find(x => x.id === t.value);
+    if (ed) { state.edition = ed; state.myCards = []; state.faceUp = []; commit(); }
+  }
+});
+const HOLD_MS = 3000;
+let drag = null, hold = null, lastY = 0, swallow = false, rowHold = null, rowFired = false;
+/* game rows: tap selects, hold 3 s opens details */
+document.addEventListener('pointerdown', e => {
+  const row = e.target.closest && e.target.closest('.crow[data-c]'); if (!row) return;
+  const c = +row.dataset.c;
+  rowHold = { id: e.pointerId, x: e.clientX, y: e.clientY, row,
+    vis: setTimeout(() => { if (rowHold && rowHold.row === row) row.classList.add('holding'); }, 300),
+    timer: setTimeout(() => { const h = rowHold; rowHold = null; if (!h) return; row.classList.remove('holding'); rowFired = true; if (navigator.vibrate) try { navigator.vibrate(15); } catch(_){}; ui.detail = c; ui.sheet = 'detail'; render(); setTimeout(() => { rowFired = false; }, 1500); }, HOLD_MS) };
+});
+function cancelRowHold(){ if (!rowHold) return; clearTimeout(rowHold.timer); clearTimeout(rowHold.vis); rowHold.row.classList.remove('holding'); rowHold = null; }
+document.addEventListener('pointermove', e => { if (rowHold && e.pointerId === rowHold.id && (Math.abs(e.clientX - rowHold.x) > 9 || Math.abs(e.clientY - rowHold.y) > 9)) cancelRowHold(); });
+document.addEventListener('pointerup', cancelRowHold);
+document.addEventListener('pointercancel', cancelRowHold);
+function beginDrag(idx, id, y){
+  const rows = [...document.querySelectorAll('.prow')];
+  if (rows.length < 2 || !rows[idx]) return;
+  drag = { idx, to: idx, rows, y0: y, id, pitch: rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top };
+  try { rows[idx].setPointerCapture(id); } catch(_){}
+  rows[idx].classList.add('dragging'); document.body.classList.add('dragging-now');
+  const ae = document.activeElement; if (ae && ae.blur && ae.tagName === 'INPUT') ae.blur();
+  try { const sel = window.getSelection && window.getSelection(); if (sel) sel.removeAllRanges(); } catch(_){}
+  if (navigator.vibrate) try { navigator.vibrate(12); } catch(_){}
+}
+document.addEventListener('pointerdown', e => {
+  const t = e.target; if (!t.closest) return;
+  const row = t.closest('.prow'); if (!row) return;
+  const rows = [...document.querySelectorAll('.prow')], idx = rows.indexOf(row);
+  if (idx < 0 || t.closest('button')) return;
+  lastY = e.clientY;
+  hold = { id: e.pointerId, x: e.clientX, y: e.clientY, idx, row, timer: setTimeout(() => { const h = hold; hold = null; if (h) { h.row.classList.remove('holding'); beginDrag(h.idx, h.id, lastY); } }, HOLD_MS), vis: setTimeout(() => { if (hold && hold.row === row) row.classList.add('holding'); }, 300) };
+});
+document.addEventListener('pointermove', e => {
+  if (hold && e.pointerId === hold.id) {
+    lastY = e.clientY;
+    if (Math.abs(e.clientX - hold.x) > 9 || Math.abs(e.clientY - hold.y) > 9) { clearTimeout(hold.timer); clearTimeout(hold.vis); hold.row.classList.remove('holding'); hold = null; }
+    return;
+  }
+  if (!drag || e.pointerId !== drag.id) return;
+  const n = drag.rows.length, dy = e.clientY - drag.y0;
+  const to = Math.max(0, Math.min(n - 1, Math.round(drag.idx + dy / drag.pitch)));
+  drag.to = to;
+  drag.rows[drag.idx].style.transform = 'translateY('+dy+'px)';
+  drag.rows.forEach((r, k) => {
+    if (k === drag.idx) return;
+    let sh = 0;
+    if (drag.idx < to && k > drag.idx && k <= to) sh = -drag.pitch;
+    else if (drag.idx > to && k < drag.idx && k >= to) sh = drag.pitch;
+    r.style.transform = sh ? 'translateY('+sh+'px)' : '';
+  });
+  e.preventDefault();
+});
+document.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive:false });
+document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('.prow, .crow')) e.preventDefault(); });
+document.addEventListener('click', e => { if (swallow || rowFired) { swallow = false; rowFired = false; e.stopPropagation(); e.preventDefault(); } }, true);
+function endDrag(e){
+  if (hold && e.pointerId === hold.id) { clearTimeout(hold.timer); clearTimeout(hold.vis); hold.row.classList.remove('holding'); hold = null; }
+  if (!drag || e.pointerId !== drag.id) return;
+  const { idx, to } = drag; drag = null; document.body.classList.remove('dragging-now');
+  swallow = true; setTimeout(() => { swallow = false; }, 400);
+  if (to !== idx) { const [p] = state.players.splice(idx, 1); state.players.splice(to, 0, p); commit(); }
+  else render();
+}
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.name !== undefined) { state.players[+t.dataset.name].name = t.value; save(); }
+  else if (t.dataset && t.dataset.ed) { ui.edit[t.dataset.ed] = t.value; }
+});
+
+compute();
+if (state.started && state.events.length) ui.modal = { type:'continue' };
+else if (state.started) ui.modal = null;
+render();
+})();
+</script>
+</body>
+</html>

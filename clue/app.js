@@ -384,7 +384,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
         '<p class="muted" style="margin-top:12px">What kind of game?</p><div class="modes">' +
         '<button class="mode" data-act="mk" data-m="fast"><b>Fast game</b><span>Cards only. Take turns making suggestions, no board.</span></button>' +
         '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Spend Sprint, Jog and Walk cards to cross the mansion and suggest in the room you enter.</span></button>' +
-        '<button class="mode" data-act="mk" data-m="3d"><b>3D game</b><span>The full game with the mansion in 3D. Same rules, same room.</span></button></div></section>';
+        '<button class="mode" data-act="mk" data-m="3d"><b>3D game</b><span>The full game with the mansion in 3D. Same rules, same room.</span></button>' +
+        '<a class="mode" href="table/"><b>Real table</b><span>Playing with real cards? Log every suggestion and work out the envelope.</span></a></div></section>';
     }
     const name = '<input type="text" id="name" maxlength="20" placeholder="Your name" aria-label="Your name" autocomplete="nickname" value="' + esc(ui.name) + '">';
     const code = '<input type="text" id="code" maxlength="5" placeholder="Room code" aria-label="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">';
@@ -393,7 +394,8 @@ export function startApp({ net, doc, win, delays, load3d }) {
       ? name + '<input type="hidden" id="code" value="' + esc(ui.code) + '"><button class="btn" data-act="join">Join room</button>'
       : '<div class="hline nm">' + name + '<button class="btn" data-act="create">Create room</button></div>' +
         '<div class="hor"><span>or</span></div>' +
-        '<div class="hline cd">' + code + '<button class="btn ghost" data-act="join">Join room</button></div>';
+        '<div class="hline cd">' + code + '<button class="btn ghost" data-act="join">Join room</button></div>' +
+        '<a class="tablelink" href="table/">Playing with real cards? Open the table tracker</a>';
     return '<div class="homestage' + (ui.menu ? ' open' : '') + '"><div class="homebg" aria-hidden="true"></div><div class="hometitle"><img src="img/logo.webp" alt="Crime" width="1100" height="340" decoding="async"></div>' +
       (panel ? '<div class="homeback" data-act="menu-close"></div>' : '') + '<div class="homedock">' + panel + rows + '</div></div>';
   }
