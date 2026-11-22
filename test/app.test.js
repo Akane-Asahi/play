@@ -735,7 +735,7 @@ async function play(db, cs, code, plan, until) {
   const db = new FakeDb();
   const c = open(db, 'h1');
   await wait(20);
-  assert(c.q('.homebg') && /Crime/.test(c.q('.hometitle').textContent), 'poster with the title');
+  assert(c.q('.homebg') && c.q('.hometitle img[alt=Crime]'), 'poster with the title');
   assert(c.win.document.body.classList.contains('home'), 'home layout');
   assert(c.q('#name') && c.q('[data-act=create]') && c.q('.hor') && c.q('#code') && c.q('[data-act=join]'), 'name, Create room, or, room code, Join room');
   assert(!c.q('#edition'), 'the kind of game is chosen after Create room');

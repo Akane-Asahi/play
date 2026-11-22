@@ -374,17 +374,6 @@ export function startApp({ net, doc, win, delays, load3d }) {
   }
 
   // ---------- screens ----------
-  // "Crime" as a 70s monospaced stencil logo, drawn as shapes so it looks the same on every phone.
-  const LOGO = '<svg viewBox="0 0 330 90" aria-hidden="false" focusable="false"><title>Crime</title>' +
-    '<filter id="ink" x="-4%" y="-8%" width="108%" height="116%"><feTurbulence type="fractalNoise" baseFrequency=".6" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.4"/></filter>' +
-    '<g transform="translate(9,3)" fill="none" stroke="#f1e8da" stroke-width="15" filter="url(#ink)">' +
-    '<path d="M50,7.5 H22 Q7.5,7.5 7.5,22 V36 M7.5,52 V63 Q7.5,76.5 22,76.5 H50"/>' +
-    '<g transform="translate(64,0)"><path d="M7.5,76.5 V7.5 M22,7.5 H33 Q48.5,7.5 48.5,22.5 Q48.5,37.5 33,37.5 H22 M30,53 L47,76.5"/></g>' +
-    '<g transform="translate(128,0)"><path d="M10,7.5 H46 M28,22 V62 M10,76.5 H46"/></g>' +
-    '<g transform="translate(192,0)"><path d="M7.5,76.5 V7.5 M48.5,76.5 V7.5"/><path d="M21.5,7.5 H34.5 L28,52 Z" fill="#f1e8da" stroke="none"/></g>' +
-    '<g transform="translate(256,0)"><path d="M7.5,76.5 V7.5 M22,7.5 H50 M22,42 H44 M22,76.5 H50"/></g>' +
-    '</g></svg>';
-
   // The first page is a poster: the picture, the title mid-right, and only a name and Join room at the bottom.
   // Starting a room of your own lives behind the small round button in the top corner.
   function homeHtml() {
@@ -405,7 +394,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
         '<div class="hor"><span>or</span></div>' +
         '<input type="text" id="code" maxlength="5" placeholder="Room code" aria-label="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
         '<button class="btn ghost" data-act="join">Join room</button></div>';
-    return '<div class="homestage' + (ui.menu ? ' open' : '') + '"><div class="homebg" aria-hidden="true"></div><div class="hometitle" role="img" aria-label="Crime">' + LOGO + '</div>' +
+    return '<div class="homestage' + (ui.menu ? ' open' : '') + '"><div class="homebg" aria-hidden="true"></div><div class="hometitle"><img src="img/logo.webp" alt="Crime" width="1100" height="340" decoding="async"></div>' +
       panel + '<div class="homedock">' + name + rows + '</div></div>';
   }
 
