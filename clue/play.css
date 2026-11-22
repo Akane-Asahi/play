@@ -353,8 +353,8 @@ body.home main{padding:0;max-width:none}
 .homebg::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.94) 0,rgba(0,0,0,.7) 150px,rgba(0,0,0,0) 300px)}
 .hometitle{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);width:min(78%,330px);pointer-events:none;filter:drop-shadow(0 3px 16px rgba(0,0,0,.9))}
 .hometitle svg{display:block;width:100%;height:auto}
-.homemenu{position:absolute;z-index:8;top:calc(12px + env(safe-area-inset-top));right:12px;width:42px;height:42px;border-radius:50%;border:1px solid rgba(241,232,218,.22);background:rgba(0,0,0,.45);color:#f1e8da;opacity:.65;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:opacity .15s,transform .1s}
-.homemenu:hover,.homemenu[aria-expanded=true]{opacity:1}
+.homemenu{position:absolute;z-index:8;top:calc(12px + env(safe-area-inset-top));right:12px;height:40px;padding:0 16px 0 12px;gap:6px;border-radius:999px;border:1px solid rgba(241,232,218,.35);background:rgba(0,0,0,.62);color:#f1e8da;font:600 14px/1 inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:transform .1s,background .15s}
+.homemenu:hover,.homemenu[aria-expanded=true]{background:rgba(0,0,0,.8)}
 .homemenu:active{transform:scale(.92)}
 .homeback{position:absolute;inset:0;z-index:4;background:rgba(0,0,0,.6)}
 .homepanel{position:absolute;z-index:6;left:14px;right:14px;top:calc(62px + env(safe-area-inset-top));background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:0 14px 40px rgba(0,0,0,.6);animation:toastin .18s ease-out;transform-origin:top}

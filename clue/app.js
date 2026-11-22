@@ -388,7 +388,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   // The first page is a poster: the picture, the title mid-right, and only a name and Join room at the bottom.
   // Starting a room of your own lives behind the small round button in the top corner.
   function homeHtml() {
-    const dots = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>';
+    const plus = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>';
     const code = ui.invited
       ? '<input type="hidden" id="code" value="' + esc(ui.code) + '">'
       : (ui.codeOpen ? '<div class="codewrap"><input type="text" id="code" maxlength="5" placeholder="Room code" aria-label="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '"></div>' : '');
@@ -404,7 +404,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
           : '<button class="btn" data-act="create">Create room</button>') + '</section>';
     }
     return '<div class="homestage"><div class="homebg" aria-hidden="true"></div><div class="hometitle" role="img" aria-label="Crime">' + LOGO + '</div>' +
-      (ui.invited ? '' : '<button class="homemenu" data-act="menu" aria-label="Start a room of your own" aria-expanded="' + (ui.menu ? 'true' : 'false') + '">' + dots + '</button>') +
+      (ui.invited ? '' : '<button class="homemenu" data-act="menu" aria-label="Start a room of your own" aria-expanded="' + (ui.menu ? 'true' : 'false') + '">' + plus + '<span>Start a room</span></button>') +
       panel +
       '<div class="homedock"><input type="text" id="name" maxlength="20" placeholder="Your name" aria-label="Your name" autocomplete="nickname" value="' + esc(ui.name) + '">' + code +
       '<button class="btn" data-act="join">Join room</button></div></div>';
