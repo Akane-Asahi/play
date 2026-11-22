@@ -353,15 +353,21 @@ body.home main{padding:0;max-width:none}
 .homebg::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.94) 0,rgba(0,0,0,.7) 150px,rgba(0,0,0,0) 300px)}
 .hometitle{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);width:min(78%,330px);pointer-events:none;filter:drop-shadow(0 3px 16px rgba(0,0,0,.9))}
 .hometitle svg{display:block;width:100%;height:auto}
-.homemenu{position:absolute;z-index:8;top:calc(12px + env(safe-area-inset-top));right:12px;height:40px;padding:0 16px 0 12px;gap:6px;border-radius:999px;border:1px solid rgba(241,232,218,.35);background:rgba(0,0,0,.62);color:#f1e8da;font:600 14px/1 inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:transform .1s,background .15s}
-.homemenu:hover,.homemenu[aria-expanded=true]{background:rgba(0,0,0,.8)}
-.homemenu:active{transform:scale(.92)}
 .homeback{position:absolute;inset:0;z-index:4;background:rgba(0,0,0,.6)}
-.homepanel{position:absolute;z-index:6;left:14px;right:14px;top:calc(62px + env(safe-area-inset-top));background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:0 14px 40px rgba(0,0,0,.6);animation:toastin .18s ease-out;transform-origin:top}
+.homepanel{position:absolute;z-index:6;left:14px;right:14px;top:calc(14px + env(safe-area-inset-top));background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:0 14px 40px rgba(0,0,0,.6);animation:toastin .18s ease-out;transform-origin:top}
 .homepanel h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.9px;color:var(--mute)}
 .homedock{position:absolute;z-index:8;left:0;right:0;bottom:0;padding:16px 18px calc(18px + env(safe-area-inset-bottom))}
 .homedock input[type=text]{background:rgba(14,11,8,.78);border:1px solid rgba(241,232,218,.24);border-radius:999px;padding:15px 20px;font-size:17px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.homedock .codewrap{margin-top:10px;animation:codein .22s ease-out;overflow:hidden}
-.homedock .codewrap input{text-align:center;letter-spacing:6px;font-weight:700;text-transform:uppercase}
 .homedock .btn{margin-top:10px;border-radius:999px;padding:16px;font-size:17px;font-weight:700}
-@keyframes codein{from{max-height:0;opacity:0}to{max-height:70px;opacity:1}}
+
+/* Dock: name, then Create room — or — room code, then Join room */
+.homedock .hbox{display:flex;flex-direction:column}
+.homedock .hor{display:flex;align-items:center;gap:12px;margin:14px 6px 12px;color:#cdbfa8;font-size:13px;letter-spacing:2px;text-transform:uppercase}
+.homedock .hor::before,.homedock .hor::after{content:'';flex:1;height:1px;background:rgba(241,232,218,.25)}
+.homedock #code{text-align:center;margin:0}
+.homedock #code:not(:placeholder-shown){letter-spacing:6px;font-weight:700;text-transform:uppercase}
+.homedock .btn.ghost{background:rgba(0,0,0,.55);border:1px solid rgba(241,232,218,.4);color:#f1e8da;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.homedock>.btn{margin-top:10px}
+.homedock .hbox>.btn:first-child{margin-top:10px}
+.homestage.open .homedock>:not(#name){display:none}
+.homepanel .px{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--ink);font-size:22px;line-height:1;padding:0;cursor:pointer}
