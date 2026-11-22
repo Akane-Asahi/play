@@ -387,15 +387,15 @@ export function startApp({ net, doc, win, delays, load3d }) {
         '<button class="mode" data-act="mk" data-m="3d"><b>3D game</b><span>The full game with the mansion in 3D. Same rules, same room.</span></button></div></section>';
     }
     const name = '<input type="text" id="name" maxlength="20" placeholder="Your name" aria-label="Your name" autocomplete="nickname" value="' + esc(ui.name) + '">';
-    // From a friend's link: just a name and Join room (the code is already known).
+    const code = '<input type="text" id="code" maxlength="5" placeholder="Room code" aria-label="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">';
+    // Two rows of two: name + Create room, then room code + Join room. From a friend's link: just a name and Join room.
     const rows = ui.invited
-      ? '<input type="hidden" id="code" value="' + esc(ui.code) + '"><button class="btn" data-act="join">Join room</button>'
-      : '<div class="hbox"><button class="btn" data-act="create">Create room</button>' +
+      ? name + '<input type="hidden" id="code" value="' + esc(ui.code) + '"><button class="btn" data-act="join">Join room</button>'
+      : '<div class="hline nm">' + name + '<button class="btn" data-act="create">Create room</button></div>' +
         '<div class="hor"><span>or</span></div>' +
-        '<input type="text" id="code" maxlength="5" placeholder="Room code" aria-label="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
-        '<button class="btn ghost" data-act="join">Join room</button></div>';
+        '<div class="hline cd">' + code + '<button class="btn ghost" data-act="join">Join room</button></div>';
     return '<div class="homestage' + (ui.menu ? ' open' : '') + '"><div class="homebg" aria-hidden="true"></div><div class="hometitle"><img src="img/logo.webp" alt="Crime" width="1100" height="340" decoding="async"></div>' +
-      (panel ? '<div class="homeback" data-act="menu-close"></div>' : '') + '<div class="homedock">' + panel + name + rows + '</div></div>';
+      (panel ? '<div class="homeback" data-act="menu-close"></div>' : '') + '<div class="homedock">' + panel + rows + '</div></div>';
   }
 
   function lobbyHtml() {

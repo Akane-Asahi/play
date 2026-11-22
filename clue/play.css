@@ -360,14 +360,16 @@ body.home main{padding:0;max-width:none}
 .homedock input[type=text]{background:rgba(14,11,8,.78);border:1px solid rgba(241,232,218,.24);border-radius:999px;padding:15px 20px;font-size:17px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .homedock .btn{margin-top:10px;border-radius:999px;padding:16px;font-size:17px;font-weight:700}
 
-/* Dock: name, then Create room — or — room code, then Join room */
-.homedock .hbox{display:flex;flex-direction:column}
-.homedock .hor{display:flex;align-items:center;gap:12px;margin:14px 6px 12px;color:#cdbfa8;font-size:13px;letter-spacing:2px;text-transform:uppercase}
+/* Dock: two rows of two. Name + Create room, or, room code + Join room */
+.homedock input[type=text]{background:rgba(14,11,8,.78);border:1px solid rgba(241,232,218,.24);border-radius:999px;padding:15px 20px;font-size:17px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.homedock .hline{display:flex;gap:10px;align-items:stretch}
+.homedock .hline input{flex:1 1 0;min-width:0;width:auto;margin:0}
+.homedock .hline .btn{flex:0 0 42%;width:auto;margin:0;padding:15px 8px;border-radius:999px;font-size:17px;font-weight:700;white-space:nowrap}
+.homedock .hor{display:flex;align-items:center;gap:12px;margin:12px 6px;color:#cdbfa8;font-size:13px;letter-spacing:2px;text-transform:uppercase}
 .homedock .hor::before,.homedock .hor::after{content:'';flex:1;height:1px;background:rgba(241,232,218,.25)}
-.homedock #code{text-align:center;margin:0}
+.homedock #code{text-align:center;padding-left:12px;padding-right:12px}
 .homedock #code:not(:placeholder-shown){letter-spacing:6px;font-weight:700;text-transform:uppercase}
 .homedock .btn.ghost{background:rgba(0,0,0,.55);border:1px solid rgba(241,232,218,.4);color:#f1e8da;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.homedock>.btn{margin-top:10px}
-.homedock .hbox>.btn:first-child{margin-top:10px}
-.homestage.open .homedock>:not(#name):not(.homepanel){display:none}
+.homedock>.btn{display:block;width:100%;margin-top:10px;border-radius:999px;padding:16px;font-size:17px;font-weight:700}
+.homestage.open .homedock .hor,.homestage.open .homedock .cd,.homestage.open .homedock .nm>.btn{display:none}
 .homepanel .px{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--ink);font-size:22px;line-height:1;padding:0;cursor:pointer}
