@@ -379,7 +379,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
   function homeHtml() {
     let panel = '';
     if (!ui.invited && ui.menu) {                               // opened by Create room: edition and kind of game
-      panel = '<div class="homeback" data-act="menu-close"></div><section class="homepanel"><button class="px" data-act="menu-close" aria-label="Close">×</button><h2>Start a room</h2><select id="edition" aria-label="Edition">' +
+      panel = '<section class="homepanel"><button class="px" data-act="menu-close" aria-label="Close">×</button><h2>Start a room</h2><select id="edition" aria-label="Edition">' +
         S.EDITIONS.map((e) => '<option value="' + esc(e.id) + '"' + (e.id === ui.edition ? ' selected' : '') + '>' + esc(e.name) + '</option>').join('') + '</select>' +
         '<p class="muted" style="margin-top:12px">What kind of game?</p><div class="modes">' +
         '<button class="mode" data-act="mk" data-m="fast"><b>Fast game</b><span>Cards only. Take turns making suggestions, no board.</span></button>' +
@@ -395,7 +395,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
         '<input type="text" id="code" maxlength="5" placeholder="Room code" aria-label="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
         '<button class="btn ghost" data-act="join">Join room</button></div>';
     return '<div class="homestage' + (ui.menu ? ' open' : '') + '"><div class="homebg" aria-hidden="true"></div><div class="hometitle"><img src="img/logo.webp" alt="Crime" width="1100" height="340" decoding="async"></div>' +
-      panel + '<div class="homedock">' + name + rows + '</div></div>';
+      (panel ? '<div class="homeback" data-act="menu-close"></div>' : '') + '<div class="homedock">' + panel + name + rows + '</div></div>';
   }
 
   function lobbyHtml() {
