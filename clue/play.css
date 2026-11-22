@@ -351,9 +351,8 @@ body.home main{padding:0;max-width:none}
 .homestage{position:fixed;inset:0;z-index:1;max-width:560px;margin:0 auto;overflow:hidden;background:#000}
 .homebg{position:absolute;inset:0;background:#000 url(img/home.webp) 50% 0/cover no-repeat}
 .homebg::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.94) 0,rgba(0,0,0,.7) 150px,rgba(0,0,0,0) 300px)}
-.hometitle{position:absolute;z-index:2;right:22px;top:46%;transform:translateY(-50%);text-align:right;color:#f1e8da;
-  font:italic 800 clamp(46px,17vw,78px)/.92 Georgia,'Times New Roman',serif;letter-spacing:.01em;text-shadow:0 2px 20px #000,0 0 3px #000;pointer-events:none}
-.hometitle::after{content:'';display:block;height:3px;margin-top:12px;border-radius:2px;background:#c8352b;transform:rotate(-2.5deg);box-shadow:0 0 12px rgba(200,53,43,.7)}
+.hometitle{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);width:min(78%,330px);pointer-events:none;filter:drop-shadow(0 3px 16px rgba(0,0,0,.9))}
+.hometitle svg{display:block;width:100%;height:auto}
 .homemenu{position:absolute;z-index:8;top:calc(12px + env(safe-area-inset-top));right:12px;width:42px;height:42px;border-radius:50%;border:1px solid rgba(241,232,218,.22);background:rgba(0,0,0,.45);color:#f1e8da;opacity:.65;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:opacity .15s,transform .1s}
 .homemenu:hover,.homemenu[aria-expanded=true]{opacity:1}
 .homemenu:active{transform:scale(.92)}
