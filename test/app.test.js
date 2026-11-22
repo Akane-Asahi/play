@@ -28,7 +28,7 @@ async function lobby(db, humans, bots, names, mode) {
   names = names || {};
   const host = open(db, humans[0]);
   await wait(5);
-  host.type('name', names[humans[0]] || 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m="' + (mode || 'fast') + '"]'); await wait(10);
+  host.type('name', names[humans[0]] || 'Hosty'); host.click('[data-act=menu]'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m="' + (mode || 'fast') + '"]'); await wait(10);
   const code = host.app.state().roomCode;
   assert.match(code, /^[A-Z0-9]{5}$/);
   assert(host.q('#share').value.endsWith('?room=' + code));
@@ -36,7 +36,7 @@ async function lobby(db, humans, bots, names, mode) {
   for (const h of humans.slice(1)) {
     const c = open(db, h + '-fresh', '?room=' + code); await wait(5);       // not in the room yet: sees the join form
     assert(c.q('#code').value === code, 'code prefilled from the link');
-    assert(!c.q('[data-act=create]') && !c.q('#edition'), 'an invited player cannot start a room');
+    assert(!c.q('[data-act=create]') && !c.q('#edition') && !c.q('[data-act=menu]'), 'an invited player cannot start a room');
     assert(c.q('[data-act=join]').className === 'btn', 'Join room is the gold button');
     const real = open(db, h, '?room=' + code); await wait(5);
     real.type('name', names[h] || 'P-' + h); real.click('[data-act=join]'); await wait(10);
@@ -324,7 +324,7 @@ async function play(db, cs, code, plan, until) {
   DL = { bot: 0, none: 0, min: 250 };
   const db = new FakeDb();
   const host = open(db, 'h1'); await wait(5);
-  host.type('name', 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m=fast]'); await wait(10);
+  host.type('name', 'Hosty'); host.click('[data-act=menu]'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m=fast]'); await wait(10);
   const code = host.app.state().roomCode;
   host.click('[data-act=bot][data-n=Sir]'); await wait(5);
   const h2 = open(db, 'h2', '?room=' + code); await wait(5);
@@ -416,7 +416,7 @@ async function play(db, cs, code, plan, until) {
   const db = new FakeDb();
   const c = open(db, 'h1');
   await wait(20);
-  c.click('[data-act=join]'); await wait(20);
+  c.click('[data-act=join]'); await wait(20);                // no name yet
   assert(c.msg().length > 0 && c.q('#msg [data-act=msg-close]'), 'an error shows with a cross');
   c.click('#msg [data-act=msg-close]'); await wait(10);
   assert(c.msg() === '' && !c.q('#msg [data-act=msg-close]'), 'the cross dismisses it');
@@ -431,7 +431,7 @@ async function play(db, cs, code, plan, until) {
   assert(db.read('roomIndex/' + oldCode) > 0 && db.read('roomIndex/' + keepCode) > 0, 'every room is indexed');
   db.write('roomIndex/' + oldCode, Date.now() - 1000);                        // its time is up
   const fresh = open(db, 'n1'); await wait(5);
-  fresh.type('name', 'New'); fresh.click('[data-act=create]'); fresh.click('[data-act=mk][data-m=fast]'); await wait(20);
+  fresh.type('name', 'New'); fresh.click('[data-act=menu]'); fresh.click('[data-act=create]'); fresh.click('[data-act=mk][data-m=fast]'); await wait(20);
   assert.equal(db.read('rooms/' + oldCode), null, 'the old room is gone');
   assert.equal(db.read('roomIndex/' + oldCode), null, 'and its index entry');
   assert(db.read('rooms/' + keepCode), 'a recent room is left alone');
@@ -465,11 +465,11 @@ async function play(db, cs, code, plan, until) {
   } });
   // the create screen offers three kinds of game
   const probe = open(db, 'p1'); await wait(5);
-  probe.type('name', 'Pat'); probe.click('[data-act=create]');
+  probe.type('name', 'Pat'); probe.click('[data-act=menu]'); probe.click('[data-act=create]');
   assert.deepEqual(probe.qa('[data-act=mk]').map((b) => b.dataset.m), ['fast', 'full', '3d'], 'Fast, Full and 3D to choose from');
   // the host can switch a lobby to 3D, and everybody sees it
   const host = open(db, 'h1'); await wait(5);
-  host.type('name', 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m="fast"]'); await wait(10);
+  host.type('name', 'Hosty'); host.click('[data-act=menu]'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m="fast"]'); await wait(10);
   const code = host.app.state().roomCode;
   host.click('[data-act=bot][data-n=Sir]'); await wait(5); host.click('[data-act=bot][data-n=Dada]'); await wait(5);
   const h2 = open(db, 'h2', '?room=' + code); await wait(5);
@@ -729,6 +729,25 @@ async function play(db, cs, code, plan, until) {
   assert(!me.q('.sheet') && !me.q('.sbackdrop'), 'the table is closed once the suggestion is sent');
   assert(db.read(path).phase === 'answer' || db.read(path).phase === 'end' || db.read(path).log.length === 1, 'and the suggestion went through');
   console.log('R ok: Suggest closes the table');
+}
+// S: first page is the poster: only a name and Join room, everything else behind the corner button
+{
+  const db = new FakeDb();
+  const c = open(db, 'h1');
+  await wait(20);
+  assert(c.q('.homebg') && /Crime/.test(c.q('.hometitle').textContent), 'poster with the title');
+  assert(c.q('#name') && c.q('[data-act=join]') && !c.q('#code'), 'at first just a name and Join room');
+  assert(!c.q('[data-act=create]') && !c.q('#edition'), 'starting a room is hidden');
+  assert(c.win.document.body.classList.contains('home'), 'home layout');
+  c.type('name', 'Zed'); c.click('[data-act=join]'); await wait(10);
+  assert(c.q('#code'), 'Join room asks for the room code');
+  c.click('[data-act=join]'); await wait(10);
+  assert(/room code/i.test(c.msg()), 'and complains if it is empty');
+  c.click('[data-act=menu]'); await wait(10);
+  assert(c.q('#edition') && c.q('[data-act=create]') && c.q('#name'), 'the corner button opens Start a room, the name stays visible');
+  c.click('[data-act=menu-close]'); await wait(10);
+  assert(!c.q('[data-act=create]'), 'tapping outside closes it');
+  console.log('S ok: poster home page');
 }
 console.log('app tests ok');
 process.exit(0);

@@ -374,26 +374,29 @@ export function startApp({ net, doc, win, delays, load3d }) {
   }
 
   // ---------- screens ----------
+  // The first page is a poster: the picture, the title mid-right, and only a name and Join room at the bottom.
+  // Starting a room of your own lives behind the small round button in the top corner.
   function homeHtml() {
-    const name = '<section class="card"><h2>Your name</h2><input type="text" id="name" maxlength="20" placeholder="e.g. Telot" autocomplete="nickname" value="' + esc(ui.name) + '"></section>';
-    // Opened from a friend's link: just a name and Join room, no starting a room of your own.
-    if (ui.invited) {
-      return name + '<section class="card"><h2>Join a room</h2><p class="muted">You were invited. Type your name, then join.</p>' +
-        '<input type="text" id="code" maxlength="5" placeholder="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
-        '<button class="btn" data-act="join">Join room</button></section>';
+    const dots = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>';
+    const code = ui.invited
+      ? '<input type="hidden" id="code" value="' + esc(ui.code) + '">'
+      : (ui.codeOpen ? '<div class="codewrap"><input type="text" id="code" maxlength="5" placeholder="Room code" aria-label="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '"></div>' : '');
+    let panel = '';
+    if (!ui.invited && ui.menu) {
+      panel = '<div class="homeback" data-act="menu-close"></div><section class="homepanel"><h2>Start a room</h2><select id="edition" aria-label="Edition">' +
+        S.EDITIONS.map((e) => '<option value="' + esc(e.id) + '"' + (e.id === ui.edition ? ' selected' : '') + '>' + esc(e.name) + '</option>').join('') + '</select>' +
+        (ui.choosing
+          ? '<p class="muted" style="margin-top:12px">What kind of game?</p><div class="modes">' +
+            '<button class="mode" data-act="mk" data-m="fast"><b>Fast game</b><span>Cards only. Take turns making suggestions, no board.</span></button>' +
+            '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Spend Sprint, Jog and Walk cards to cross the mansion and suggest in the room you enter.</span></button>' +
+            '<button class="mode" data-act="mk" data-m="3d"><b>3D game</b><span>The full game with the mansion in 3D. Same rules, same room.</span></button></div>'
+          : '<button class="btn" data-act="create">Create room</button>') + '</section>';
     }
-    return name +
-      '<section class="card"><h2>Start a room</h2><select id="edition">' +
-      S.EDITIONS.map((e) => '<option value="' + esc(e.id) + '"' + (e.id === ui.edition ? ' selected' : '') + '>' + esc(e.name) + '</option>').join('') +
-      '</select>' + (ui.choosing
-        ? '<p class="muted" style="margin-top:12px">What kind of game?</p><div class="modes">' +
-          '<button class="mode" data-act="mk" data-m="fast"><b>Fast game</b><span>Cards only. Take turns making suggestions, no board.</span></button>' +
-          '<button class="mode" data-act="mk" data-m="full"><b>Full game</b><span>Spend Sprint, Jog and Walk cards to cross the mansion and suggest in the room you enter.</span></button>' +
-          '<button class="mode" data-act="mk" data-m="3d"><b>3D game</b><span>The full game with the mansion in 3D. Same rules, same room.</span></button></div>'
-        : '<button class="btn" data-act="create">Create room</button>') + '</section>' +
-      '<section class="card"><h2>Join a room</h2><p class="muted">Type the code a friend sent you, or open their link.</p>' +
-      '<input type="text" id="code" maxlength="5" placeholder="Room code" autocapitalize="characters" autocomplete="off" value="' + esc(ui.code) + '">' +
-      '<button class="btn ghost" data-act="join">Join room</button></section>';
+    return '<div class="homestage"><div class="homebg" aria-hidden="true"></div><div class="hometitle">Crime</div>' +
+      (ui.invited ? '' : '<button class="homemenu" data-act="menu" aria-label="Start a room of your own" aria-expanded="' + (ui.menu ? 'true' : 'false') + '">' + dots + '</button>') +
+      panel +
+      '<div class="homedock"><input type="text" id="name" maxlength="20" placeholder="Your name" aria-label="Your name" autocomplete="nickname" value="' + esc(ui.name) + '">' + code +
+      '<button class="btn" data-act="join">Join room</button></div></div>';
   }
 
   function lobbyHtml() {
@@ -986,6 +989,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
     const ttl = doc.querySelector('header h1');
     if (ttl) ttl.innerHTML = inGame && !game.over ? 'Turn ' + (E.logOf(game).length + 1) + ' <span class="tdot">•</span> <span class="tname">' + esc(nm(game.turn)) + '</span>' : 'Clues';
     doc.body.classList.toggle('fullmap', inGame && hasMap());
+    doc.body.classList.toggle('home', !roomCode);
     const hd = doc.querySelector('header');
     if (hd && hd.offsetHeight) doc.documentElement.style.setProperty('--hh', hd.offsetHeight + 'px');
     const pb = $('players-btn');
@@ -1037,7 +1041,9 @@ export function startApp({ net, doc, win, delays, load3d }) {
     switch (a) {
       case 'msg-close': msg = ''; ui.info = false; render(); break;
       case 'create': try { msg = ''; needName(); ui.choosing = true; } catch (err) { msg = err.message; } render(); break;
-      case 'mk': run(() => createRoom(el.dataset.m)); break;
+      case 'menu': ui.menu = !ui.menu; ui.choosing = false; msg = ''; render(); break;
+      case 'menu-close': ui.menu = false; ui.choosing = false; render(); break;
+      case 'mk': ui.menu = false; run(() => createRoom(el.dataset.m)); break;
       case 'setmode': run(() => (isHost() ? net.set(room('meta/mode'), modeOf(el.dataset.m)) : null)); break;
       case 'card': ui.card = ui.card === el.dataset.k ? null : el.dataset.k; render(); break;
       case 'deduce': run(doDeduce); break;
@@ -1046,7 +1052,14 @@ export function startApp({ net, doc, win, delays, load3d }) {
       case 'stayin': run(doStayIn); break;
       case 'stay': run(() => doMove('stay')); break;
       case 'go': run(() => doMove(+el.getAttribute('data-d'))); break;
-      case 'join': run(() => { const c = (ui.code || '').trim().toUpperCase(); if (!c) throw new Error('Type the room code first.'); return joinRoom(c); }); break;
+      case 'join':
+        if (!ui.invited && !ui.codeOpen && !(ui.code || '').trim()) {     // first tap: ask for the room code
+          try { needName(); } catch (err) { msg = err.message; ui.info = false; render(); break; }
+          ui.codeOpen = true; msg = ''; render();
+          { const ci = $('code'); if (ci && ci.focus) ci.focus(); }
+          break;
+        }
+        run(() => { const c = (ui.code || '').trim().toUpperCase(); if (!c) throw new Error('Type the room code first.'); return joinRoom(c); }); break;
       case 'copy': run(async () => {
         try { await win.navigator.clipboard.writeText(shareUrl()); ui.copied = true; win.clearTimeout(ui.copiedT); ui.copiedT = win.setTimeout(() => { ui.copied = false; render(); }, 2200); toast('Link copied'); }
         catch (err) { const i = $('share'); if (i) { i.focus(); i.select(); } toast('Select the link and copy it'); }
