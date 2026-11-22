@@ -381,3 +381,6 @@ body.home main{padding:0;max-width:none}
 .homedock .hline .btn{flex:0 0 auto;width:auto;height:100%;margin:0;padding:0 18px;border-radius:999px;white-space:nowrap}
 .homedock .hline .btn.ghost{background:rgba(241,232,218,.12);border:1px solid rgba(241,232,218,.4);-webkit-backdrop-filter:none;backdrop-filter:none}
 .homedock .hline #code{text-align:left}
+
+/* Back to the first page (lobby) sits at the far left of the nav bar */
+#back-btn{margin-right:auto;margin-left:-4px;color:var(--ink)}

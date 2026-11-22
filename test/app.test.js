@@ -11,7 +11,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };          // delays for every page: no waiting, unless a test says otherwise
 let L3D;                                       // fake loader for the 3D board view, set by the 3D tests
 function open(db, uid, query) {
-  const dom = new JSDOM('<header><span class="hside"><button id="players-btn" data-act="players" hidden></button></span><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
+  const dom = new JSDOM('<header><span class="hside"><button id="back-btn" data-act="back" hidden></button><button id="players-btn" data-act="players" hidden></button></span><span id="code-pill" hidden></span></header><main><div id="view"></div><p id="msg"></p></main>',
     { url: 'https://example.test/play/clue/' + (query || ''), pretendToBeVisual: true });
   const win = dom.window;
   win.ClueSolver = S;
@@ -737,6 +737,7 @@ async function play(db, cs, code, plan, until) {
   await wait(20);
   assert(c.q('.homebg') && c.q('.hometitle img[alt=Crime]'), 'poster with the title');
   assert(c.win.document.body.classList.contains('home'), 'home layout');
+  assert(c.q('#back-btn').hidden, 'no Back button on the first page');
   assert(c.q('#name') && c.q('[data-act=create]') && c.q('.hor') && c.q('#code') && c.q('[data-act=join]'), 'name, Create room, or, room code, Join room');
   assert(!c.q('#edition'), 'the kind of game is chosen after Create room');
   c.click('[data-act=create]'); await wait(10);
@@ -748,6 +749,24 @@ async function play(db, cs, code, plan, until) {
   c.click('[data-act=join]'); await wait(10);
   assert(/room code/i.test(c.msg()), 'Join room asks for the code');
   console.log('S ok: poster home page');
+}
+// T: Back button in the lobby
+{
+  const db = new FakeDb();
+  const host = open(db, 'h1'); await wait(5);
+  host.type('name', 'Hosty'); host.click('[data-act=create]'); host.click('[data-act=mk][data-m=fast]'); await wait(10);
+  const code = host.app.state().roomCode;
+  const gst = open(db, 'h2', '?room=' + code); await wait(5);
+  gst.type('name', 'Gus'); gst.click('[data-act=join]'); await wait(10);
+  assert(!host.q('#back-btn').hidden && !gst.q('#back-btn').hidden, 'Back button in the lobby nav bar');
+  assert.equal(host.qa('.pl').length, 2);
+  host.click('#back-btn'); await wait(10);
+  assert(host.q('[data-act=cancel-yes]'), 'the host is asked before leaving the room');
+  host.click('[data-act=cancel-no]'); await wait(10);
+  assert(!host.q('[data-act=cancel-yes]') && host.qa('.pl').length === 2, 'and can stay');
+  gst.click('#back-btn'); await wait(30);
+  assert.equal(host.qa('.pl').length, 1, 'a guest who goes back leaves the room');
+  console.log('T ok: Back button in the lobby');
 }
 console.log('app tests ok');
 process.exit(0);

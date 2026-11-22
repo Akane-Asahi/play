@@ -978,12 +978,14 @@ export function startApp({ net, doc, win, delays, load3d }) {
     const pill = $('code-pill');
     pill.hidden = !roomCode;
     if (roomCode) pill.textContent = 'Room ' + roomCode;
+    { const bb = $('back-btn'); if (bb) bb.hidden = !(roomCode && !(meta && meta.status === 'playing')); }      // back to the first page while still in the lobby
     let h;
     if (roomCode && gone && !meta) h = '<section class="card"><h2>Game cancelled</h2><p>' + 'The host cancelled this game and deleted the room.</p><button class="btn" data-act="home">Back to start</button></section>';
     else if (!roomCode || !meta) h = roomCode ? '<p class="muted center">Joining…</p>' : homeHtml();
     else if (!players[uid]) h = '<section class="card"><p>You are no longer in this room.</p><button class="btn" data-act="home">Back to start</button></section>';
     else if (meta.status === 'playing') h = gameHtml();
-    else h = lobbyHtml();
+    else h = (ui.cancel && isHost() ? '<section class="card cancelc"><p><b>Leave and delete this room?</b> Everyone who joined is sent back to the start. This can\'t be undone.</p>' +
+      '<div class="row"><button class="btn danger grow" data-act="cancel-yes">Yes, delete room</button><button class="btn ghost grow" data-act="cancel-no">Stay</button></div></section>' : '') + lobbyHtml();
     const inGame = !!(roomCode && meta && meta.status === 'playing' && players[uid] && game);
     const ttl = doc.querySelector('header h1');
     if (ttl) ttl.innerHTML = inGame && !game.over ? 'Turn ' + (E.logOf(game).length + 1) + ' <span class="tdot">•</span> <span class="tname">' + esc(nm(game.turn)) + '</span>' : 'Clues';
@@ -1064,6 +1066,14 @@ export function startApp({ net, doc, win, delays, load3d }) {
       case 'cancel': ui.cancel = true; render(); break;
       case 'cancel-no': ui.cancel = false; render(); break;
       case 'cancel-yes': run(async () => { if (!isHost()) return; const code = roomCode; await net.remove('roomIndex/' + code); await net.remove('rooms/' + code); win.location.href = win.location.pathname; }); break;
+      case 'back':
+        if (isHost()) {                                                  // the host's room would be left behind: ask first
+          ui.cancel = true; render();
+        } else run(async () => {
+          try { if (roomCode && players[uid]) await net.remove(room('players/' + uid)); } catch (err) { /* leaving anyway */ }
+          win.location.href = win.location.pathname;
+        });
+        break;
       case 'home': win.location.href = win.location.pathname; break;
       case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
       case 'next': ui.seen++; render(); break;
