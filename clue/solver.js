@@ -331,7 +331,7 @@
   function bestSuggestions(result, state, top, room) {
     if (!result || !result.ok || !result.samples || !result.samples.length || result.solved) return [];
     const D = result.deck, N = D.N, E = result.nP, nO = E + 1, me = state.me || 0;
-    const n = state.players.length, step = state.dir === 'ccw' ? -1 : 1;
+    const n = state.players.length, ad = state.askDir || state.dir, step = ad === 'ccw' ? -1 : 1;
     const order = []; for (let k = 1; k < n; k++) order.push((((me + step * k) % n) + n) % n);
     const kk = Math.max(1, Math.ceil(result.samples.length / 450));
     const smp = result.samples.filter((_, i) => i % kk === 0), M = smp.length;

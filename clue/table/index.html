@@ -280,7 +280,7 @@ const allEditions = () => S.EDITIONS.concat(customEditions);
 /* ---------------- state ---------------- */
 function freshState(){
   const st = { v:2, edition:S.EDITIONS[0], players:[{name:'Me',hand:0,me:true},{name:'Player 2',hand:0},{name:'Player 3',hand:0},{name:'Player 4',hand:0}],
-    me:0, myCards:[], faceUp:[], rules:{askAll:false, locate:true}, dir:'cw', handsAuto:true, events:[], announced:[], started:false };
+    me:0, myCards:[], faceUp:[], rules:{askAll:false, locate:true}, dir:'cw', askDir:'cw', handsAuto:true, events:[], announced:[], started:false };
   recalc(st); return st;
 }
 const meIdx = st => Math.max(0, st.players.findIndex(p => p.me));
@@ -296,7 +296,7 @@ function recalc(st){
 function loadState(){
   try {
     const raw = lsGet(KEY);
-    if (raw) { const st = JSON.parse(raw); if (st && st.players) { st.rules = st.rules || {askAll:false, locate:true}; st.faceUp = st.faceUp || []; st.announced = st.announced || []; st.dir = st.dir === 'ccw' ? 'ccw' : 'cw'; if (!st.players.some(p => p.me)) st.players[0].me = true; st.first = st.first || 0; return st; } }
+    if (raw) { const st = JSON.parse(raw); if (st && st.players) { st.rules = st.rules || {askAll:false, locate:true}; st.faceUp = st.faceUp || []; st.announced = st.announced || []; st.dir = st.dir === 'ccw' ? 'ccw' : 'cw'; st.askDir = st.askDir === 'ccw' || st.askDir === 'cw' ? st.askDir : st.dir; if (!st.players.some(p => p.me)) st.players[0].me = true; st.first = st.first || 0; return st; } }
     const old = lsGet(KEY1);
     if (old) { const o = JSON.parse(old);
       if (o && o.players) { const st = freshState(); st.players = o.players.map(p => ({name:p.name, hand:p.hand})); st.me = 0; st.myCards = o.myCards || []; st.events = o.events || [];
@@ -463,6 +463,8 @@ const ICON_CW = '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><
 const ICON_CCW = '<svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
 const dirStep = () => state.dir === 'ccw' ? -1 : 1;
 function seatAfter(i, k){ const n = state.players.length; return (((i + dirStep()*k) % n) + n) % n; }
+const askStep = () => state.askDir === 'ccw' ? -1 : 1;
+function askAfter(i, k){ const n = state.players.length; return (((i + askStep()*k) % n) + n) % n; }
 function nextBy(){
   if (ui.by != null && ui.by < state.players.length) return ui.by;
   return autoBy();
@@ -476,13 +478,19 @@ function autoBy(){
   for (let k = 1; k <= n; k++) { const c = seatAfter(last, k); if (!out.has(c) || out.size >= n) return c; }
   return seatAfter(last, 1);
 }
+function dirSeg(label, act, ccw){
+  return '<div class="dirrow"><span>'+label+'</span><span class="seg">'
+    + '<button class="dbtn'+(ccw?' on':'')+'" data-act="'+act+'" data-d="ccw" aria-label="Anticlockwise">'+ICON_CCW+'</button>'
+    + '<button class="dbtn'+(!ccw?' on':'')+'" data-act="'+act+'" data-d="cw" aria-label="Clockwise">'+ICON_CW+'</button></span></div>';
+}
 function dirHtml(){
-  const ccw = state.dir === 'ccw', n = state.players.length;
+  const ccw = state.dir === 'ccw', ack = state.askDir === 'ccw', n = state.players.length;
   const seq = []; for (let k = 0; k < n; k++) seq.push(esc(nm(seatAfter(0, k))));
-  return '<div class="dirrow"><span>Direction of play</span><span class="seg">'
-    + '<button class="dbtn'+(ccw?' on':'')+'" data-act="dir" data-d="ccw" aria-label="Anticlockwise">'+ICON_CCW+'</button>'
-    + '<button class="dbtn'+(!ccw?' on':'')+'" data-act="dir" data-d="cw" aria-label="Clockwise">'+ICON_CW+'</button></span></div>'
-    + '<p class="muted dirord">'+(ccw?'Anticlockwise: ':'Clockwise: ')+seq.join(' → ')+' → …</p>';
+  const aseq = []; for (let k = 1; k < n; k++) aseq.push(esc(nm(askAfter(0, k))));
+  return dirSeg('Direction of play', 'dir', ccw)
+    + '<p class="muted dirord">'+(ccw?'Anticlockwise: ':'Clockwise: ')+seq.join(' → ')+' → …</p>'
+    + dirSeg('Direction of asking', 'askdir', ack)
+    + '<p class="muted dirord">Who answers a suggestion first. '+(ack?'Anticlockwise':'Clockwise')+', e.g. when '+esc(nm(0))+' asks: '+aseq.join(' → ')+'</p>';
 }
 function setupView(){
   const n = state.players.length;
@@ -591,7 +599,7 @@ function softWord(w){
   return esc(w.slice(0, at)) + '&shy;' + esc(w.slice(at));
 }
 const softName = name => name.split(' ').map(softWord).join(' ');
-function recOrder(){ const n = state.players.length, o = []; for (let i = 1; i < n; i++) o.push(seatAfter(ui.rec.by, i)); return o; }
+function recOrder(){ const n = state.players.length, o = []; for (let i = 1; i < n; i++) o.push(askAfter(ui.rec.by, i)); return o; }
 function recStart(by){
   ui.rec = { by: by === 'other' ? (nextBy() === 0 ? seatAfter(0,1) : nextBy()) : +by, cards:[null,null,null], step:'pick', responses:[], mine: by !== 'other' };
   if (ui.sel.every(x => x != null)) { ui.rec.cards = ui.sel.slice(); ui.rec.step = 'ask'; }
@@ -923,6 +931,7 @@ document.addEventListener('click', e => {
     case 'goto-cards': { const t = document.getElementById('sec-cards'); if (t) t.scrollIntoView({behavior:'smooth', block:'start'}); break; }
     case 'goto-players': { const t = document.getElementById('sec-players'); if (t) t.scrollIntoView({behavior:'smooth', block:'start'}); break; }
     case 'dir': state.dir = el.dataset.d === 'ccw' ? 'ccw' : 'cw'; commit(); break;
+    case 'askdir': state.askDir = el.dataset.d === 'ccw' ? 'ccw' : 'cw'; commit(); break;
     case 'hands-auto': state.handsAuto = true; commit(); break;
     case 'edition-new': ui.edit = { name:'', suspects:'', weapons:'', rooms:'' }; ui.sheet = 'edition'; render(); break;
     case 'edition-save': {
