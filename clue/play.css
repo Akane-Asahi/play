@@ -86,7 +86,13 @@ table.nt{width:100%;border-collapse:collapse;font-size:13.5px}
 .fin.freeze *{animation-play-state:paused!important}
 @media (prefers-reduced-motion:reduce){.fin *{animation-duration:.01s!important;animation-delay:0s!important}}
 /* hand-filled notes sheet */
-.nscroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
+.sheet .notes .nt thead th{top:0}
+.nt.manual.dense .rd{width:18px;height:18px;margin:0}
+.nt.manual.dense .rd svg{width:11px;height:11px}
+.nt.manual.dense td.mk{padding:5px 0}
+.nt.manual.dense th{padding-left:1px;padding-right:1px;font-size:9px;letter-spacing:.2px}
+.nt.manual.dense td:first-child{font-size:14px;padding-right:2px}
+.nscroll{overflow-x:clip;margin:0 -4px;padding:0 4px}   /* clip, not auto: a scroll box here would stop the header row sticking to the sheet */
 .nt.manual td.mk{white-space:nowrap;padding:5px 2px}
 .rd{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:none;color:var(--mute);font-size:12px;line-height:1;padding:0;margin:0 1px;cursor:pointer;vertical-align:middle;-webkit-tap-highlight-color:transparent}
 .rd.y.on{background:var(--ok);border-color:var(--ok);color:#10200f}
@@ -175,6 +181,8 @@ header h1 .tname{border-bottom:0;cursor:default}
 .notes .muted{color:var(--cmute)}
 .notes .nt{font-size:15px}
 .notes .nt th{color:var(--cmute);font-size:11px;letter-spacing:1px}
+/* column names stay put under the sheet's top edge while the rows scroll beneath */
+.notes .nt thead th{position:sticky;top:var(--hh,0px);z-index:3;background:var(--cream);box-shadow:0 1px 0 var(--cline);padding-top:12px;padding-bottom:8px}
 .notes .nt td{border-top:1px solid var(--cline);padding:9px 4px}
 .notes .nt tr.cat td{border-top:0;color:var(--cmute);font-size:12px;letter-spacing:2px;font-weight:700;padding-top:16px}
 .notes .nt td:first-child{color:var(--cink);font-size:16px}
@@ -182,7 +190,7 @@ header h1 .tname{border-bottom:0;cursor:default}
 .notes .nt .bar{height:4px;border-radius:2px;background:var(--cline);overflow:hidden;margin:3px auto 0;width:34px}
 .notes .nt .bar i{display:block;height:100%;background:var(--cred)}
 .notes .nt .y{color:#2d7a4f}
-.notes .nt .n{color:var(--cmute);opacity:.5}
+.notes .nt td.n{color:var(--cmute);opacity:.5}
 .notes .nt .q{color:var(--cred);font-weight:800}
 .notes .nt tr.mine td:first-child,.notes .nt tr.elim td:first-child{opacity:1;color:var(--cmute);text-decoration:line-through}
 .notes .nt tr.mine td:first-child .muted{text-decoration:none}
@@ -191,6 +199,9 @@ header h1 .tname{border-bottom:0;cursor:default}
 .notes .nt tr.pk td.pkc:active{background:var(--csel)}
 .notes .rd{border-color:#bfae8a;color:var(--cmute)}
 .notes .rd.y.on{background:#2d7a4f;border-color:#2d7a4f;color:#fff}
+.notes .rd:not(.on),.notes .rd:not(.on) svg{color:var(--cmute)!important;border-color:#bfae8a;background:none;opacity:.55}
+.notes .nt tr.held td:first-child{color:var(--cmute);text-decoration:line-through}
+.notes .nt tr.held td:first-child .sp,.notes .nt tr.held td:first-child .chip{text-decoration:line-through;opacity:.6}
 .notes .rd.n.on{background:var(--cred);border-color:var(--cred);color:#fff}
 .notes>p.muted{margin:10px 6px 0}
 main:has(.float){padding-bottom:230px}

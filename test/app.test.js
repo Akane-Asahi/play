@@ -212,11 +212,12 @@ async function play(db, cs, code, plan, until) {
   assert(!other.q('.nt .pc') && other.q('.rd') && !host.q('.nt .pc'), 'others see only the hand-filled sheet');
   const cellOf = (b) => b.dataset.c + ':' + b.dataset.o;
   const ticks = () => other.qa('.rd.y.on').map(cellOf), crosses = () => other.qa('.rd.n.on').map(cellOf);
-  const A = other.qa('.rd.y')[0], B = other.qa('.rd.n')[1];
+  const A0c = other.qa('.rd.y')[0].dataset.c;   // a tick owns its row, so cross a cell in a different row
+  const A = other.qa('.rd.y')[0], B = other.qa('.rd.n').find((x) => x.dataset.c !== A0c);
   assert.notEqual(cellOf(A), cellOf(B));
   const Ac = cellOf(A), Bc = cellOf(B);                // the page redraws after each tap, so look the buttons up again
   other.click(A); other.click(other.qa('.rd.n').find((x) => cellOf(x) === Bc));
-  assert.deepEqual([ticks(), crosses()], [[Ac], [Bc]], 'a tick and a cross on different cells');
+  assert.deepEqual([ticks(), crosses().filter((x) => !x.startsWith(A0c + ':'))], [[Ac], [Bc]], 'a tick and a cross on different cells (the ticked row reads as crossed elsewhere)');
   assert.equal(other.q('.rd.y.on').getAttribute('aria-checked'), 'true');
   other.click(other.qa('.rd.n').find((x) => cellOf(x) === cellOf(A)));
   assert.deepEqual([ticks(), crosses()], [[], [Bc, Ac].sort()], 'a cross replaces the tick on the same cell');
@@ -767,6 +768,38 @@ async function play(db, cs, code, plan, until) {
   gst.click('#back-btn'); await wait(30);
   assert.equal(host.qa('.pl').length, 1, 'a guest who goes back leaves the room');
   console.log('T ok: Back button in the lobby');
+}
+// AN: a card shown to me is ticked in my hand-filled notes for that player and crossed for everyone else
+{
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], {}, '3d');
+  const [host, , me] = cs;
+  const ord = db.read('rooms/' + code + '/game/order') || cs.map((c) => c.uid);
+  const hostHand = db.read('rooms/' + code + '/hands/h1');
+  const card = hostHand[0];
+  db.write('rooms/' + code + '/shown/h3/0', { card, from: 'h1' }); db.notify();
+  await wait(20);
+  if (!me.q('.rd')) me.click('[data-act=sheet][data-s=notes]');
+  const on = (v) => me.qa('.rd.' + v + '.on').map((b) => b.dataset.c + ':' + b.dataset.o).sort();
+  assert.deepEqual(on('y'), [card + ':h1'], 'tick for the player who showed it');
+  assert.deepEqual(on('n'), [card + ':env', card + ':h2'].sort(), 'cross for the envelope and the other player');
+  me.click(me.qa('.rd.y').find((b) => b.dataset.c === '' + card && b.dataset.o === 'h1'));
+  assert.deepEqual(on('y'), [], 'tapping the automatic tick clears it');
+  const ppl = (() => { me.click('#players-btn'); me.click('.ppanel [data-act=pexp][data-p="h1"]'); return me.qa('.ppanel .chip').map((x) => x.textContent); })();
+  assert(ppl.length && ppl.every((x) => x === '?'), 'cleared tick is gone from the players list too');
+  me.click('.phead .x');
+  me.click(me.qa('.rd.y').find((b) => b.dataset.c === '' + card && b.dataset.o === 'h1'));
+  assert.deepEqual(on('y'), [card + ':h1'], 'and comes back with another tap');
+  assert(!host.q('.rd.y.on'), 'only the player who was shown the card gets the marks');
+  // a tick owns its row: the other columns read as crossed, and tapping one of them moves the tick
+  const other = me.qa('.rd.y').find((x) => x.dataset.c === '' + card && x.dataset.o === 'h2');
+  assert(other, 'other columns of a ticked row stay tappable');
+  assert.equal(me.qa('.rd.n.on').filter((x) => x.dataset.c === '' + card).length, 2, 'two crossed columns in the ticked row');
+  assert(/held/.test(me.qa('table.manual tr').find((r) => r.querySelector('.rd[data-c="' + card + '"]')).className) , 'row marked as held so the name is crossed out');
+  me.click(me.qa('.rd.n').find((x) => x.dataset.c === '' + card && x.dataset.o === 'h2'));
+  assert.deepEqual(on('y'), [card + ':h2'], 'tapping a crossed column moves the tick there');
+  assert.deepEqual(on('n').filter((x) => x.startsWith(card + ':')), [card + ':env', card + ':h1'].sort(), 'and the old owner is crossed');
+  console.log('AN ok: shown cards are marked automatically in the notes');
 }
 console.log('app tests ok');
 process.exit(0);

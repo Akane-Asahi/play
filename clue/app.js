@@ -500,7 +500,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
     if (p === uid) return (myHand || []).slice().sort((a, b) => a - b);
     const out = [], r = helper();
     if (r) { const o = order().indexOf(p); for (let c = 0; c < D.CARDS.length; c++) if (r.certain[c] === o) out.push(c); }
-    else for (let c = 0; c < D.CARDS.length; c++) if (ui.notes[c + ':' + p] === 'y') out.push(c);
+    else { const auto = autoNotes(); for (let c = 0; c < D.CARDS.length; c++) if (noteVal(c + ':' + p, auto) === 'y') out.push(c); }
     return out;
   }
   function playersPanel() {
@@ -621,27 +621,54 @@ export function startApp({ net, doc, win, delays, load3d }) {
   // Drawn as SVG so phones can't swap the tick for a coloured emoji; both take the button's colour.
   const TICK = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const CROSS = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-  // The notes sheet everyone gets: a tick or a cross per card and player, filled in by hand.
+  // Marks the game already knows for certain: a card someone showed me is theirs, so it is
+  // ticked for them and crossed for the envelope and everyone else. Kept apart from the
+  // hand-made marks; tapping a filled cell overrides it ('-' = cleared on purpose).
+  function autoNotes() {
+    const out = {};
+    if (!myShown) return out;
+    const others = order().filter((p) => p !== uid);
+    Object.keys(myShown).forEach((n) => {
+      const s = myShown[n];
+      if (!s || s.from == null || s.card == null) return;
+      ['env'].concat(others).forEach((o) => { out[s.card + ':' + o] = o === s.from ? 'y' : 'n'; });
+    });
+    return out;
+  }
+  function noteVal(key, auto) {
+    const v = ui.notes[key];
+    if (v === '-') return undefined;
+    return v !== undefined ? v : (auto || autoNotes())[key];
+  }
+  // A card has one owner: the column with a tick in this row (or null). The other columns of
+  // that row then read as crossed.
+  const noteCols = () => ['env'].concat(order().filter((p) => p !== uid));
+  function rowTick(c, auto) { auto = auto || autoNotes(); return noteCols().find((o) => noteVal(c + ':' + o, auto) === 'y') || null; }
+  // Clear the stored value of one cell, remembering a cleared automatic mark as '-'.
+  function clearNote(key, auto) { if ((auto || autoNotes())[key]) ui.notes[key] = '-'; else delete ui.notes[key]; }
+  // The notes sheet everyone gets: a tick or a cross per card and player, filled in by hand
+  // (cards shown to me are filled in automatically). A tick crosses out the rest of the row
+  // and the card's name; tapping another column of that row moves the tick there.
   function manualNotesHtml(D) {
     if (!myHand) return '';
     if (!meta.helper) return pickOnlyHtml(D);
-    const others = order().filter((p) => p !== uid);
+    const others = order().filter((p) => p !== uid), auto = autoNotes();
     const rd = (c, o, v, on) => '<button class="rd ' + v + (on ? ' on' : '') + '" role="radio" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + (v === 'y' ? 'Has it' : 'Does not have it') + '" data-act="mark" data-c="' + c + '" data-o="' + o + '" data-v="' + v + '">' + (v === 'y' ? TICK : CROSS) + '</button>';
-    let h = '<section class="card notes"><h2>Your notes</h2><div class="nscroll"><table class="nt manual"><thead><tr><th></th><th>Envelope</th>' +
+    let h = '<section class="card notes"><h2>Your notes</h2><div class="nscroll"><table class="nt manual' + (others.length > 3 ? ' dense' : '') + '"><thead><tr><th></th><th>Envelope</th>' +
       others.map((p) => '<th>' + esc(nmFull(p).slice(0, 7)) + '</th>').join('') + '</tr></thead><tbody>';
     [0, 1, 2].forEach((k) => {
       h += '<tr class="cat"><td colspan="' + (2 + others.length) + '">' + S.CAT_PLURAL[k] + '</td></tr>';
       for (let c = D.CS[k]; c < D.CS[k] + D.SZ[k]; c++) {
-        const mine = myHand.includes(c);
-        h += '<tr class="' + (mine ? 'mine' : '') + selClass(c, k) + '">' + nameCell(D, c, k, mine);
+        const mine = myHand.includes(c), tk = mine ? null : rowTick(c, auto);
+        h += '<tr class="' + (mine ? 'mine' : tk && tk !== 'env' ? 'held' : '') + selClass(c, k) + '">' + nameCell(D, c, k, mine);
         ['env'].concat(others).forEach((o) => {
-          const v = ui.notes[c + ':' + o];
+          const v = tk ? (o === tk ? 'y' : 'n') : noteVal(c + ':' + o, auto);
           h += mine ? '<td class="n">–</td>' : '<td class="mk">' + rd(c, o, 'y', v === 'y') + rd(c, o, 'n', v === 'n') + '</td>';
         });
         h += '</tr>';
       }
     });
-    return h + '</tbody></table></div><p class="muted">Tap ✓ if they have the card (or it is in the envelope), ✕ if they don\'t. Tap again to clear.' + (picking() ? ' Tap a card name to choose it.' : '') + '</p></section>';
+    return h + '</tbody></table></div><p class="muted">Tap ✓ if they have the card (or it is in the envelope), ✕ if they don\'t. Tap again to clear. Cards shown to you are filled in for you.' + (picking() ? ' Tap a card name to choose it.' : '') + '</p></section>';
   }
 
   // With the notes sheet switched off there is still a list to choose cards from.
@@ -1106,7 +1133,13 @@ export function startApp({ net, doc, win, delays, load3d }) {
       case 'show': run(() => showCard(+el.dataset.c)); break;
       case 'mark': {
         const key = el.dataset.c + ':' + el.dataset.o;
-        if (ui.notes[key] === el.dataset.v) delete ui.notes[key]; else ui.notes[key] = el.dataset.v;
+        const all = autoNotes(), auto = all[key], c = el.dataset.c, tk = rowTick(c, all);
+        if (tk && tk !== el.dataset.o) {                 // the row belongs to someone else: move the tick here
+          clearNote(c + ':' + tk, all);
+          if (auto === 'y') delete ui.notes[key]; else ui.notes[key] = 'y';
+        } else if (noteVal(key, all) === el.dataset.v) clearNote(key, all);
+        else if (auto === el.dataset.v) delete ui.notes[key];
+        else ui.notes[key] = el.dataset.v;
         lsSet(notesKey(), JSON.stringify(ui.notes));
         render(); break;
       }
