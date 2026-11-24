@@ -799,6 +799,15 @@ async function play(db, cs, code, plan, until) {
   me.click(me.qa('.rd.n').find((x) => x.dataset.c === '' + card && x.dataset.o === 'h2'));
   assert.deepEqual(on('y'), [card + ':h2'], 'tapping a crossed column moves the tick there');
   assert.deepEqual(on('n').filter((x) => x.startsWith(card + ':')), [card + ':env', card + ':h1'].sort(), 'and the old owner is crossed');
+  // Play again starts a new game in the same room: the old marks are gone, on screen and on the device
+  {
+    const k = 'clues-notes-' + code + '-h3', before = me.qa('.rd.on').length;
+    assert(before > 0, 'there are marks from this game');
+    assert.equal(me.win.localStorage.getItem(k + '-game'), '' + db.read('rooms/' + code + '/meta/startedAt'), 'marks are tied to the game they were made in');
+    db.write('rooms/' + code + '/meta/startedAt', Date.now() + 5); db.notify(); await wait(30);
+    assert.equal(me.qa('.rd.on').length, 0, 'a new game starts with no marks');
+    assert.equal(me.win.localStorage.getItem(k), '{}', 'and they are cleared from the device');
+  }
   console.log('AN ok: shown cards are marked automatically in the notes');
 }
 console.log('app tests ok');

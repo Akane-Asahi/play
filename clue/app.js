@@ -1002,7 +1002,16 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return h + notesHtml(D) + turnsHtml(D) + cancelHtml() + floatHtml(D) + modalHtml(D);
   }
 
+  // Marks belong to one game: Play again reuses the room, so wipe them when a new game (new startedAt) begins.
+  function syncNotesGame() {
+    if (!roomCode || !meta || !meta.startedAt || meta.status !== 'playing') return;
+    const gk = notesKey() + '-game', now = String(meta.startedAt), was = lsGet(gk);
+    if (was === now) return;
+    if (was != null) { ui.notes = {}; lsSet(notesKey(), '{}'); }   // an older game's marks
+    lsSet(gk, now);
+  }
   function render() {
+    syncNotesGame();
     ui.holdWant = false;
     const pill = $('code-pill');
     pill.hidden = !roomCode;
