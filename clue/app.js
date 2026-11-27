@@ -483,7 +483,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       inner = '<div class="fsum">' + hint + '</div><div class="row">' +
         '<button class="btn grow dbtn ' + (can ? 'open' : 'locked') + '" data-act="deduce" aria-label="Deduce, ' + (can ? 'unlocked' : 'locked') + '">' + (can ? LOCK_OPEN : LOCK) + ' Deduce <em>' + (can ? 'unlocked' : 'locked') + '</em></button>' +
         (to != null ? '<button class="btn ghost grow" data-act="passage">To ' + esc(D.CARDS[g.rc0 + to]) + '</button>' : '') +
-        (wasCalled() && here >= 0 && !g.again ? '<button class="btn ghost grow" data-act="stayin">Suggest here</button>' : (!mustLeave ? '<button class="btn ghost grow" data-act="stay">Stay put</button>' : '')) +
+        (wasCalled() && here >= 0 && !g.again ? '<button class="btn ghost grow" data-act="stayin">Suggest here</button>' : (!E.canLeave(g, uid) && !can && to == null ? '<button class="btn ghost grow" data-act="stay">Stay put</button>' : '')) +   // only when boxed in: no card can take you anywhere, so the game never stalls
         '</div>' + accuseBtn;
     } else if (g.phase === 'end') {
       inner = '<div class="row"><button class="btn grow" data-act="end">End turn</button><button class="btn danger grow" data-act="accuse-open">Final Accusation</button></div>';
