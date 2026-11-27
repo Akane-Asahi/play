@@ -912,10 +912,10 @@ export function startApp({ net, doc, win, delays, load3d }) {
       ensure3d();
       if (ui.v3 !== false) {
         ui.v3state = st;
-        return '<div class="bmap b3d"><div class="b3d-view" id="b3d-host">' + (ui.v3 ? '' : '<p class="muted center b3d-wait">Loading the 3D mansion…</p>') + '</div>' + legendHtml(D) + '</div>';
+        return '<div class="bmap b3d"><div class="b3d-view" id="b3d-host">' + (ui.v3 ? '' : '<p class="muted center b3d-wait">Loading the 3D mansion…</p>') + '</div>' + (hasMap() ? '' : legendHtml(D)) + '</div>';
       }
     }
-    return '<div class="bmap">' + boardSvg({ pos: st.pos, order: st.order, me: uid, turn: st.turn, out: st.out, roomNames: st.roomNames, go: st.go }) + legendHtml(D) + '</div>';
+    return '<div class="bmap">' + boardSvg({ pos: st.pos, order: st.order, me: uid, turn: st.turn, out: st.out, roomNames: st.roomNames, go: st.go }) + (hasMap() ? '' : legendHtml(D)) + '</div>';
   }
 
   // ---------- the 3D board (3D game only) ----------
@@ -986,7 +986,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       const closed = ui.finaleClosed === (meta.startedAt || 0) + ':' + game.over.winner;
       const bar = '<section class="card finbar"><div class="muted">' + (game.over.byDefault ? 'Everyone else is out' : 'Case closed') + '</div><div class="who">' + esc(nmFull(game.over.winner)) + '</div>' +
         '<div class="row"><button class="btn grow" data-act="finale-open">Show result</button>' + (isHost() ? '<button class="btn ghost grow" data-act="again">Play again</button>' : '') + '<button class="btn ghost grow" data-act="home">Home</button></div></section>';
-      if (hasMap()) return '<div class="mapfull">' + (closed ? bar : '') + boardHtml(D) + '</div>' + hudHtml(D) + sheetHtml(D) +
+      if (hasMap()) return '<div class="mapfull"><div class="mtop">' + (closed ? bar : '') + legendHtml(D) + '</div>' + boardHtml(D) + '</div>' + hudHtml(D) + sheetHtml(D) +
         (closed ? '' : '<div class="modal"><div class="mcard finale" role="dialog" aria-modal="true"><button class="mclose" data-act="finale-close" aria-label="Close">×</button>' + finaleHtml(D) + '</div></div>');
       return (closed ? bar : '') + boardHtml(D) + turnsHtml(D) +
         (closed ? '' : '<div class="modal"><div class="mcard finale" role="dialog" aria-modal="true"><button class="mclose" data-act="finale-close" aria-label="Close">×</button>' + finaleHtml(D) + '</div></div>');
@@ -997,7 +997,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
       const k = log.length + ':' + game.pos[uid];
       if (ui.selKey !== k) { ui.selKey = k; ui.sel[2] = hereCard(); }
     }
-    if (hasMap()) return '<div class="mapfull"><section class="card act">' + actionHtml(D) + '</section>' + boardHtml(D) + '</div>' + hudHtml(D) + sheetHtml(D) + modalHtml(D);
+    if (hasMap()) return '<div class="mapfull"><div class="mtop"><section class="card act">' + actionHtml(D) + '</section>' + legendHtml(D) + '</div>' + boardHtml(D) + '</div>' + hudHtml(D) + sheetHtml(D) + modalHtml(D);
     const h = '<section class="card act">' + actionHtml(D) + '</section>' + boardHtml(D);
     return h + notesHtml(D) + turnsHtml(D) + cancelHtml() + floatHtml(D) + modalHtml(D);
   }
