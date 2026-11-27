@@ -692,6 +692,20 @@ async function play(db, cs, code, plan, until) {
   assert(!watcher.q('.hud .bubble'), 'the bubble sinks away after a few seconds');
   console.log('Z ok: result bubble above the Final Accusation panel');
 }
+// R2: standing in a room, that room is the one to call: it is fixed in the notes table
+{
+  DL = { bot: 0, none: 0, min: 0, slide: 0, bubble: 40 };
+  const db = new FakeDb();
+  const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
+  const me = cs[0], path = 'rooms/' + code + '/game', g = db.read(path);
+  db.write(path, { ...g, turn: me.uid, phase: 'suggest', pos: { ...g.pos, [me.uid]: -(3 + 1) } }); db.notify(); await wait(30);
+  me.click('[data-act=sheet][data-s=notes]'); await wait(20);
+  assert(me.q('.nt .lk'), 'the room I stand in shows a lock');
+  assert(!me.q('.nt [data-act=pick][data-k="2"]'), 'no room can be tapped');
+  assert(me.q('.nt [data-act=pick][data-k="0"]') && me.q('.nt [data-act=pick][data-k="1"]'), 'suspects and weapons still can');
+  assert(me.q('.nt tr.sel, .nt td.sel, .nt .sel'), 'and the room is already selected');
+  console.log('R2 ok: the room you are in cannot be unselected');
+}
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {
   DL = { bot: 0, none: 0, min: 0, slide: 60 };

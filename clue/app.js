@@ -441,9 +441,12 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return true;
   }
   // The first cell of a notes row: the card's name, tappable while I'm choosing.
+  // In the mansion game a suggestion must name the room I am standing in, so that room is fixed (not tappable).
+  const roomLocked = () => !!(full() && game && game.turn === uid && game.phase === 'suggest' && !ui.accusing && hereCard() != null);
   function nameCell(D, c, k, mine, extra) {
-    const pk = picking();
-    return '<td' + (pk ? ' class="pkc" data-act="pick" data-k="' + k + '" data-c="' + c + '"' : '') + '>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') + (extra || '') + '</td>';
+    const lock = k === 2 && roomLocked(), pk = picking() && !lock;
+    return '<td' + (pk ? ' class="pkc" data-act="pick" data-k="' + k + '" data-c="' + c + '"' : '') + '>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') +
+      (lock && c === hereCard() ? ' <span class="lk" title="You are in this room, so you must call it">🔒</span>' : '') + (extra || '') + '</td>';
   }
   const selClass = (c, k) => (ui.sel[k] === c ? ' sel' : '') + (picking() ? ' pk' : '');
 
@@ -1113,7 +1116,7 @@ export function startApp({ net, doc, win, delays, load3d }) {
         });
         break;
       case 'home': win.location.href = win.location.pathname; break;
-      case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
+      case 'pick': { const k = +el.dataset.k, c = +el.dataset.c; if (k === 2 && roomLocked()) break; ui.sel[k] = ui.sel[k] === c ? null : c; ui.confirm = false; render(); break; }
       case 'next': ui.seen++; render(); break;
       case 'finale-close': ui.finaleClosed = (meta.startedAt || 0) + ':' + game.over.winner; render(); break;
       case 'finale-open': ui.finaleClosed = null; render(); break;
