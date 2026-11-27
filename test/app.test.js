@@ -698,13 +698,17 @@ async function play(db, cs, code, plan, until) {
   const db = new FakeDb();
   const { cs, code } = await lobby(db, ['h1', 'h2', 'h3'], [], null, 'full');
   const me = cs[0], path = 'rooms/' + code + '/game', g = db.read(path);
-  db.write(path, { ...g, turn: me.uid, phase: 'suggest', pos: { ...g.pos, [me.uid]: -(3 + 1) } }); db.notify(); await wait(30);
+  db.write(path, { ...g, turn: me.uid, phase: 'suggest', pos: { ...g.pos, [me.uid]: -(3 + 1) }, mv: { p: me.uid, c: 'j', n: 1 } }); db.notify(); await wait(30);
   me.click('[data-act=sheet][data-s=notes]'); await wait(20);
   assert(me.q('.nt .lk'), 'the room I stand in shows a lock');
   assert(!me.q('.nt [data-act=pick][data-k="2"]'), 'no room can be tapped');
   assert(me.q('.nt [data-act=pick][data-k="0"]') && me.q('.nt [data-act=pick][data-k="1"]'), 'suspects and weapons still can');
   assert(me.q('.nt tr.sel, .nt td.sel, .nt .sel'), 'and the room is already selected');
-  console.log('R2 ok: the room you are in cannot be unselected');
+  // called into the room (nobody moved me: no move this turn): nothing is locked
+  const g2 = db.read(path), nm2 = { ...g2 }; delete nm2.mv;
+  db.write(path, nm2); db.notify(); await wait(30);
+  assert(!me.q('.nt .lk') && me.q('.nt [data-act=pick][data-k="2"]'), 'only the room you chose to move into is locked');
+  console.log('R2 ok: the room you moved into cannot be unselected');
 }
 // Q: Notes / Turns: the movement buttons hide while a sheet is open; the sheet slides up and slides back out
 {

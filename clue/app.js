@@ -441,8 +441,9 @@ export function startApp({ net, doc, win, delays, load3d }) {
     return true;
   }
   // The first cell of a notes row: the card's name, tappable while I'm choosing.
-  // In the mansion game a suggestion must name the room I am standing in, so that room is fixed (not tappable).
-  const roomLocked = () => !!(full() && game && game.turn === uid && game.phase === 'suggest' && !ui.accusing && hereCard() != null);
+  // In the mansion game, once I choose a room and move into it (a card or a secret passage), that room is the one I
+  // must call, so it is fixed in my table. (If I was only called into a room, nothing is locked.)
+  const roomLocked = () => !!(full() && game && game.turn === uid && game.phase === 'suggest' && !ui.accusing && hereCard() != null && game.mv && game.mv.p === uid);
   function nameCell(D, c, k, mine, extra) {
     const lock = k === 2 && roomLocked(), pk = picking() && !lock;
     return '<td' + (pk ? ' class="pkc" data-act="pick" data-k="' + k + '" data-c="' + c + '"' : '') + '>' + cardHtml(D, c) + (mine ? ' <span class="muted">yours</span>' : '') +
